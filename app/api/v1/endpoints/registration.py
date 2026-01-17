@@ -1,0 +1,219 @@
+
+from typing import Any, List
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from sqlalchemy.orm import Session
+import csv
+import io
+
+from app.api import deps
+from app.models.examination import Registration, GradeMapping
+from app.models.course import CourseOffering
+from app.models.user import User, UserRole
+from app.schemas.examination import Registration as RegistrationSchema, RegistrationCreate, RegistrationUpdate
+
+router = APIRouter()
+
+@router.post("/", response_model=RegistrationSchema)
+def create_registration(
+    *,
+    db: Session = Depends(deps.get_db),
+    registration_in: RegistrationCreate,
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Register for a course.
+    """
+    # Students can only register themselves
+    if current_user.role == UserRole.STUDENT and current_user.id != registration_in.student_id:
+         raise HTTPException(status_code=400, detail="Cannot register for another student")
+    
+    # Check if offering exists
+    offering = db.query(CourseOffering).filter(CourseOffering.id == registration_in.course_offering_id).first()
+    if not offering:
+        raise HTTPException(status_code=404, detail="Course offering not found")
+
+    # Check if already registered
+    existing = db.query(Registration).filter(
+        Registration.student_id == registration_in.student_id,
+        Registration.course_offering_id == registration_in.course_offering_id
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Already registered for this course")
+
+    registration = Registration(**registration_in.dict())
+    db.add(registration)
+    db.commit()
+    db.refresh(registration)
+    return registration
+
+@router.get("/me", response_model=List[RegistrationSchema])
+def read_my_registrations(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Get current user's registrations.
+    """
+    registrations = db.query(Registration).filter(Registration.student_id == current_user.id).all()
+    return registrations
+
+@router.post("/bulk-upload")
+async def bulk_upload_registrations(
+    file: UploadFile = File(...),
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_admin),
+) -> Any:
+    """
+    Bulk upload registrations from CSV.
+    """
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="Invalid file format. Please upload a CSV file.")
+
+    content = await file.read()
+    decoded_content = content.decode('utf-8')
+    csv_reader = csv.DictReader(io.StringIO(decoded_content))
+    
+    registrations_created = 0
+    errors = []
+    
+    for row_idx, row in enumerate(csv_reader):
+        try:
+            student_id = row.get('student_id')
+            course_code = row.get('course_code')
+            semester_id = int(row.get('semester_id'))
+            
+            if not student_id or not course_code or not semester_id:
+                errors.append(f"Row {row_idx}: Missing required fields")
+                continue
+            
+            # Find offering
+            offering = db.query(CourseOffering).filter(
+                CourseOffering.course_code == course_code,
+                CourseOffering.semester_id == semester_id
+            ).first()
+            
+            if not offering:
+                errors.append(f"Row {row_idx}: Course offering not found for {course_code} in semester {semester_id}")
+                continue
+            
+            # Check existing
+            existing = db.query(Registration).filter(
+                Registration.student_id == student_id,
+                Registration.course_offering_id == offering.id
+            ).first()
+            
+            if not existing:
+                reg = Registration(student_id=student_id, course_offering_id=offering.id)
+                db.add(reg)
+                registrations_created += 1
+                
+        except Exception as e:
+            errors.append(f"Row {row_idx}: {str(e)}")
+            
+    db.commit()
+    
+    return {
+        "registrations_created": registrations_created,
+        "errors": errors
+    }
+
+@router.put("/{registration_id}/grade", response_model=RegistrationSchema)
+def assign_grade(
+    *,
+    db: Session = Depends(deps.get_db),
+    registration_id: int,
+    grade_in: RegistrationUpdate,
+    current_user: User = Depends(deps.get_current_active_teacher),
+) -> Any:
+    """
+    Assign grade to a registration.
+    """
+    registration = db.query(Registration).filter(Registration.id == registration_id).first()
+    if not registration:
+        raise HTTPException(status_code=404, detail="Registration not found")
+    
+    # Verify teacher teaches this course (or is admin)
+    # TODO: Add check if current_user is teacher of this course offering
+    
+    if grade_in.grade:
+        registration.grade = grade_in.grade
+        # Auto calculate grade point
+        mapping = db.query(GradeMapping).filter(GradeMapping.grade == grade_in.grade).first()
+        if mapping:
+            registration.grade_point = mapping.points
+        else:
+             raise HTTPException(status_code=400, detail=f"Grade mapping not found for grade {grade_in.grade}")
+
+    db.add(registration)
+    db.commit()
+    db.refresh(registration)
+    return registration
+
+@router.post("/bulk-upload-grades")
+async def bulk_upload_grades(
+    course_code: str,
+    semester_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_active_teacher),
+) -> Any:
+    """
+    Bulk upload grades from CSV.
+    """
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="Invalid file format. Please upload a CSV file.")
+
+    # Verify offering
+    offering = db.query(CourseOffering).filter(
+        CourseOffering.course_code == course_code,
+        CourseOffering.semester_id == semester_id
+    ).first()
+    
+    if not offering:
+        raise HTTPException(status_code=404, detail="Course offering not found")
+
+    content = await file.read()
+    decoded_content = content.decode('utf-8')
+    csv_reader = csv.DictReader(io.StringIO(decoded_content))
+    
+    grades_updated = 0
+    errors = []
+    
+    # Cache mappings
+    mappings = {m.grade: m.points for m in db.query(GradeMapping).all()}
+    
+    for row_idx, row in enumerate(csv_reader):
+        try:
+            student_id = row.get('student_id')
+            grade = row.get('grade')
+            
+            if not student_id or not grade:
+                errors.append(f"Row {row_idx}: Missing student_id or grade")
+                continue
+            
+            if grade not in mappings:
+                errors.append(f"Row {row_idx}: Invalid grade {grade}")
+                continue
+                
+            registration = db.query(Registration).filter(
+                Registration.student_id == student_id,
+                Registration.course_offering_id == offering.id
+            ).first()
+            
+            if registration:
+                registration.grade = grade
+                registration.grade_point = mappings[grade]
+                db.add(registration)
+                grades_updated += 1
+            else:
+                errors.append(f"Row {row_idx}: Registration not found for student {student_id}")
+
+        except Exception as e:
+            errors.append(f"Row {row_idx}: {str(e)}")
+            
+    db.commit()
+    
+    return {
+        "grades_updated": grades_updated,
+        "errors": errors
+    }
