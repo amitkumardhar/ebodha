@@ -1,0 +1,20 @@
+# E-Bodha: Academic information management system
+This is an academic management system used for executive program students. The program would be used to track student progress, submission of grades, generation of grade cards, transcripts and certificates. The program would also allow the teachers and administrators to view and modify information.
+
+## Users & Stakeholders
+The primary stakeholders in the system are students, teachers, administrators.
+### Students
+Students are identified with an unique alphanumeric ID number assigned to them. The ID number starts with "EMT" followed by two digit year followed by two character course code and then four digit serial number. Each student has a name, address, phone number and email. A student is admitted for a particular discipline. A student also registers for a semester to attend courses.
+### Teachers
+Teachers are identified by a unique alphanumeric name used as login ID. A teacher teaches zero or more courses in a semester. A teacher uploads marks of each of the tests for each of the students atending course and appear for the test. The teacher also assigns grades to students attending his/her course at the end of course.
+### Administrators
+Administrators are identified by a unique alphanumeric name used as login ID. An administration can do changes in the systems based on their roles.
+
+## Other enitities in the system
+
+### Semester
+A semester has a start date and an end date. A semester has an associated academic calendar.
+### Academic Calendar
+An academic calendar consists of a start and end date for a set of events. The set of events is dynamic and can chnage. The universe of events monotonically increases.
+### Course
+A course start its journey when it is 
