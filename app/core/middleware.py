@@ -31,19 +31,7 @@ class LoggingMiddleware(BaseHTTPMiddleware):
                 )
                 token_data = TokenPayload(**payload)
                 user_id = token_data.sub
-                
-                # To get role, we might need to query DB or if we embedded it in token.
-                # Since we didn't embed role in token, we query DB.
-                # Ideally, we should embed role in token to avoid DB hit on every log,
-                # but for now let's query.
-                # Optimization: Use a cache or embed role in token in next iteration.
-                db = SessionLocal()
-                try:
-                    user = db.query(User).filter(User.id == user_id).first()
-                    if user:
-                        role = user.role.value
-                finally:
-                    db.close()
+                role = token_data.role
                     
             except Exception:
                 pass # Invalid token or other error, treat as anonymous

@@ -217,3 +217,51 @@ async def bulk_upload_grades(
         "grades_updated": grades_updated,
         "errors": errors
     }
+
+from app.schemas.report import StudentGradeReportItem, ExamMarksReport, CourseInfo
+
+@router.get("/my-report", response_model=List[StudentGradeReportItem])
+def get_my_report(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Get comprehensive grade report for the current student.
+    """
+    if current_user.current_role != UserRole.STUDENT and current_user.current_role != UserRole.ALUMNI:
+         # Allow alumni too? Requirement says "students", but alumni usually want transcripts.
+         # Let's restrict to student/alumni.
+         pass
+         
+    registrations = db.query(Registration).filter(Registration.student_id == current_user.id).all()
+    
+    report = []
+    for reg in registrations:
+        # Format credits
+        c = reg.course_offering.course
+        credits_str = f"{c.lecture_credits}-{c.tutorial_credits}-{c.practice_credits}"
+        
+        course_info = CourseInfo(
+            code=c.code,
+            name=c.name,
+            semester_id=reg.course_offering.semester_id,
+            credits=credits_str
+        )
+        
+        # Get Marks
+        marks_list = []
+        for m in reg.marks:
+            marks_list.append(ExamMarksReport(
+                exam_name=m.examination.name,
+                max_marks=m.examination.max_marks,
+                marks_obtained=m.marks_obtained
+            ))
+            
+        report.append(StudentGradeReportItem(
+            course=course_info,
+            grade=reg.grade,
+            grade_point=reg.grade_point,
+            marks=marks_list
+        ))
+        
+    return report

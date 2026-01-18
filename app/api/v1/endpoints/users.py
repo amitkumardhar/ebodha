@@ -89,3 +89,28 @@ def update_user_role(
     db.commit()
     db.refresh(user)
     return user
+
+from app.schemas.user import UserPasswordUpdate
+
+@router.put("/me/password", response_model=Any)
+def change_password(
+    *,
+    db: Session = Depends(deps.get_db),
+    password_in: UserPasswordUpdate,
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Change current user password.
+    """
+    user = db.query(User).filter(User.id == current_user.id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    if not security.verify_password(password_in.current_password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Incorrect password")
+        
+    user.hashed_password = security.get_password_hash(password_in.new_password)
+    db.add(user)
+    db.commit()
+    
+    return {"message": "Password updated successfully"}

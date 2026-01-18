@@ -11,6 +11,7 @@ from app.core import security
 from app.core.config import settings
 from app.models.user import User, UserRole
 from app.schemas.user import TokenPayload
+from app.models.token import RevokedToken
 
 reusable_oauth2 = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/login/access-token"
@@ -23,7 +24,7 @@ def get_db() -> Generator:
     finally:
         db.close()
 
-def get_current_user(
+async def get_current_user(
     db: Session = Depends(get_db), token: str = Depends(reusable_oauth2)
 ) -> User:
     try:
@@ -36,17 +37,29 @@ def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Could not validate credentials",
         )
+        
+    # Check if token is revoked
+    if await RevokedToken.find_one(RevokedToken.token == token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked",
+        )
+
     user = db.query(User).filter(User.id == token_data.sub).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
+    
+    # Attach current role from token to user instance
+    # This is a runtime attribute, not persisted
+    user.current_role = token_data.role
     return user
 
 def get_current_active_admin(
     current_user: User = Depends(get_current_user),
 ) -> User:
-    if current_user.role != UserRole.ADMIN:
+    if current_user.current_role != UserRole.ADMIN:
         raise HTTPException(
             status_code=400, detail="The user doesn't have enough privileges"
         )
@@ -55,7 +68,7 @@ def get_current_active_admin(
 def get_current_active_teacher(
     current_user: User = Depends(get_current_user),
 ) -> User:
-    if current_user.role != UserRole.TEACHER and current_user.role != UserRole.ADMIN:
+    if current_user.current_role != UserRole.TEACHER and current_user.current_role != UserRole.ADMIN:
          raise HTTPException(
             status_code=400, detail="The user doesn't have enough privileges"
         )
