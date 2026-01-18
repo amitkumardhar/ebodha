@@ -17,4 +17,5 @@ class StudentGradeReportItem(BaseModel):
     course: CourseInfo
     grade: Optional[str]
     grade_point: Optional[float]
+    compartment_grade: Optional[str] = None
     marks: List[ExamMarksReport]

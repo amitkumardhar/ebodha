@@ -257,11 +257,202 @@ def get_my_report(
                 marks_obtained=m.marks_obtained
             ))
             
+        # Get Compartment Grade
+        compartment_reg = db.query(CompartmentRegistration).filter(
+            CompartmentRegistration.student_id == current_user.id,
+            CompartmentRegistration.course_offering_id == reg.course_offering_id
+        ).first()
+        
+        compartment_grade = compartment_reg.grade if compartment_reg else None
+            
         report.append(StudentGradeReportItem(
             course=course_info,
             grade=reg.grade,
             grade_point=reg.grade_point,
+            compartment_grade=compartment_grade,
             marks=marks_list
         ))
         
     return report
+
+from app.schemas.examination import CompartmentRegistrationCreate, CompartmentRegistration as CompartmentRegistrationSchema, CompartmentGradeUpdate
+from app.models.examination import Compartment as CompartmentRegistration
+
+@router.post("/compartment", response_model=CompartmentRegistrationSchema)
+def register_compartment(
+    *,
+    db: Session = Depends(deps.get_db),
+    registration_in: CompartmentRegistrationCreate,
+    current_user: User = Depends(deps.get_current_active_admin), # Or teacher? Usually admin/student. Let's say admin for now as per "registering students"
+) -> Any:
+    """
+    Register a student for compartment examination.
+    """
+    # Verify student is registered for the course
+    reg = db.query(Registration).filter(
+        Registration.student_id == registration_in.student_id,
+        Registration.course_offering_id == registration_in.course_offering_id
+    ).first()
+    
+    if not reg:
+        raise HTTPException(status_code=400, detail="Student is not registered for this course offering")
+        
+    # Check if already registered for compartment
+    existing = db.query(CompartmentRegistration).filter(
+        CompartmentRegistration.student_id == registration_in.student_id,
+        CompartmentRegistration.course_offering_id == registration_in.course_offering_id
+    ).first()
+    
+    if existing:
+        raise HTTPException(status_code=400, detail="Student already registered for compartment exam")
+        
+    compartment_reg = CompartmentRegistration(
+        student_id=registration_in.student_id,
+        course_offering_id=registration_in.course_offering_id
+    )
+    db.add(compartment_reg)
+    db.commit()
+    db.refresh(compartment_reg)
+    return compartment_reg
+
+@router.post("/compartment/bulk", response_model=Any)
+def bulk_register_compartment(
+    *,
+    db: Session = Depends(deps.get_db),
+    file: UploadFile = File(...),
+    current_user: User = Depends(deps.get_current_active_admin),
+) -> Any:
+    """
+    Bulk register students for compartment examination via CSV.
+    CSV Format: student_id, course_offering_id
+    """
+    contents = file.file.read().decode("utf-8")
+    csv_reader = csv.DictReader(io.StringIO(contents))
+    
+    registered_count = 0
+    errors = []
+    
+    for row in csv_reader:
+        try:
+            student_id = row["student_id"].strip()
+            course_offering_id = int(row["course_offering_id"].strip())
+            
+            # Verify registration
+            reg = db.query(Registration).filter(
+                Registration.student_id == student_id,
+                Registration.course_offering_id == course_offering_id
+            ).first()
+            
+            if not reg:
+                errors.append(f"Student {student_id} not registered for course {course_offering_id}")
+                continue
+                
+            # Check existing
+            existing = db.query(CompartmentRegistration).filter(
+                CompartmentRegistration.student_id == student_id,
+                CompartmentRegistration.course_offering_id == course_offering_id
+            ).first()
+            
+            if existing:
+                errors.append(f"Student {student_id} already registered for compartment in {course_offering_id}")
+                continue
+                
+            compartment_reg = CompartmentRegistration(
+                student_id=student_id,
+                course_offering_id=course_offering_id
+            )
+            db.add(compartment_reg)
+            registered_count += 1
+            
+        except Exception as e:
+            errors.append(f"Error processing row {row}: {str(e)}")
+            
+    db.commit()
+    
+    return {
+        "registered_count": registered_count,
+        "errors": errors
+    }
+
+@router.put("/compartment/{compartment_id}/grade", response_model=CompartmentRegistrationSchema)
+def update_compartment_grade(
+    *,
+    db: Session = Depends(deps.get_db),
+    compartment_id: int,
+    grade_in: CompartmentGradeUpdate,
+    current_user: User = Depends(deps.get_current_active_teacher),
+) -> Any:
+    """
+    Update grade for a compartment registration.
+    """
+    compartment_reg = db.query(CompartmentRegistration).filter(CompartmentRegistration.id == compartment_id).first()
+    if not compartment_reg:
+        raise HTTPException(status_code=404, detail="Compartment registration not found")
+        
+    compartment_reg.grade = grade_in.grade
+    
+    # Auto calculate grade point
+    mapping = db.query(GradeMapping).filter(GradeMapping.grade == grade_in.grade).first()
+    if mapping:
+        compartment_reg.grade_point = mapping.points
+    else:
+         raise HTTPException(status_code=400, detail=f"Grade mapping not found for grade {grade_in.grade}")
+         
+    db.add(compartment_reg)
+    db.commit()
+    db.refresh(compartment_reg)
+    return compartment_reg
+
+@router.post("/compartment/bulk-grades", response_model=Any)
+def bulk_upload_compartment_grades(
+    *,
+    db: Session = Depends(deps.get_db),
+    file: UploadFile = File(...),
+    current_user: User = Depends(deps.get_current_active_teacher),
+) -> Any:
+    """
+    Bulk upload grades for compartment examination via CSV.
+    CSV Format: student_id, course_offering_id, grade
+    """
+    contents = file.file.read().decode("utf-8")
+    csv_reader = csv.DictReader(io.StringIO(contents))
+    
+    updated_count = 0
+    errors = []
+    
+    # Cache mappings
+    mappings = {m.grade: m.points for m in db.query(GradeMapping).all()}
+    
+    for row in csv_reader:
+        try:
+            student_id = row["student_id"].strip()
+            course_offering_id = int(row["course_offering_id"].strip())
+            grade = row["grade"].strip()
+            
+            compartment_reg = db.query(CompartmentRegistration).filter(
+                CompartmentRegistration.student_id == student_id,
+                CompartmentRegistration.course_offering_id == course_offering_id
+            ).first()
+            
+            if not compartment_reg:
+                errors.append(f"Compartment registration not found for student {student_id} in course {course_offering_id}")
+                continue
+            
+            if grade not in mappings:
+                errors.append(f"Invalid grade {grade} for student {student_id}")
+                continue
+                
+            compartment_reg.grade = grade
+            compartment_reg.grade_point = mappings[grade]
+            db.add(compartment_reg)
+            updated_count += 1
+            
+        except Exception as e:
+            errors.append(f"Error processing row {row}: {str(e)}")
+            
+    db.commit()
+    
+    return {
+        "updated_count": updated_count,
+        "errors": errors
+    }

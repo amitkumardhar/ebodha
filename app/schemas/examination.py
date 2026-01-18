@@ -48,3 +48,20 @@ class Registration(RegistrationBase):
     grade_point: Optional[float] = None
     class Config:
         orm_mode = True
+
+class CompartmentRegistrationBase(BaseModel):
+    student_id: str
+    course_offering_id: int
+
+class CompartmentRegistrationCreate(CompartmentRegistrationBase):
+    pass
+
+class CompartmentRegistration(CompartmentRegistrationBase):
+    id: int
+    grade: Optional[str] = None
+    grade_point: Optional[float] = None
+    class Config:
+        orm_mode = True
+
+class CompartmentGradeUpdate(BaseModel):
+    grade: str

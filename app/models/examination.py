@@ -40,3 +40,13 @@ class Marks(Base):
     
     registration = relationship("Registration", back_populates="marks")
     examination = relationship("Examination", back_populates="marks")
+
+class Compartment(Base):
+    id = Column(Integer, primary_key=True, index=True)
+    student_id = Column(String, ForeignKey("user.id"), nullable=False)
+    course_offering_id = Column(Integer, ForeignKey("courseoffering.id"), nullable=False)
+    grade = Column(String, nullable=True)
+    grade_point = Column(Float, nullable=True)
+    
+    student = relationship("User")
+    course_offering = relationship("CourseOffering")
