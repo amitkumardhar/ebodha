@@ -45,13 +45,20 @@ def create_user(
         name=user_in.name,
         email=user_in.email,
         hashed_password=security.get_password_hash(user_in.password),
-        role=user_in.role,
         gender=user_in.gender,
         address=user_in.address,
         phone_number=user_in.phone_number,
         is_active=user_in.is_active,
     )
     db.add(user)
+    db.flush()  # Flush to get user in session
+    
+    # Add roles
+    from app.models.user import UserRoleEntry
+    for role in user_in.roles:
+        role_entry = UserRoleEntry(user_id=user.id, role=role)
+        db.add(role_entry)
+    
     db.commit()
     db.refresh(user)
     return user
@@ -79,14 +86,25 @@ def update_user_role(
     current_user: User = Depends(deps.get_current_active_admin),
 ) -> Any:
     """
-    Update user role.
+    Add a role to user (if not already present).
     """
+    from app.models.user import UserRoleEntry
+    
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    user.role = role
-    db.add(user)
-    db.commit()
+    
+    # Check if user already has this role
+    existing_role = db.query(UserRoleEntry).filter(
+        UserRoleEntry.user_id == user_id,
+        UserRoleEntry.role == role
+    ).first()
+    
+    if not existing_role:
+        role_entry = UserRoleEntry(user_id=user_id, role=role)
+        db.add(role_entry)
+        db.commit()
+    
     db.refresh(user)
     return user
 

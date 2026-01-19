@@ -24,7 +24,7 @@ def create_registration(
     Register for a course.
     """
     # Students can only register themselves
-    if current_user.role == UserRole.STUDENT and current_user.id != registration_in.student_id:
+    if current_user.current_role == UserRole.STUDENT and current_user.id != registration_in.student_id:
          raise HTTPException(status_code=400, detail="Cannot register for another student")
     
     # Check if offering exists

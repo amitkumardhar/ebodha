@@ -131,6 +131,7 @@ def read_semester_course_details(
             ))
         
         results.append(StudentCourseDetails(
+            registration_id=reg.id,
             student_id=reg.student_id,
             student_name=reg.student.name,
             grade=reg.grade,

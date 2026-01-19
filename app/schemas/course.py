@@ -34,6 +34,7 @@ class CourseOffering(CourseOfferingBase):
 from app.schemas.report import ExamMarksReport
 
 class StudentCourseDetails(BaseModel):
+    registration_id: int
     student_id: str
     student_name: str
     grade: Optional[str]
