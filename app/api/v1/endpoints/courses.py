@@ -284,3 +284,92 @@ async def bulk_upload_course_offerings(
         "offerings_created": offerings_created,
         "errors": errors
     }
+
+from app.schemas.teacher import TeacherCourse as TeacherCourseSchema, TeacherCourseCreate, TeacherInfo
+
+@router.post("/offerings/{offering_id}/teachers", response_model=TeacherCourseSchema)
+def assign_teacher_to_offering(
+    *,
+    db: Session = Depends(deps.get_db),
+    offering_id: int,
+    teacher_id: str,
+    current_user: User = Depends(deps.get_current_active_admin),
+) -> Any:
+    """
+    Assign a teacher to a course offering.
+    """
+    # Check if offering exists
+    offering = db.query(CourseOffering).filter(CourseOffering.id == offering_id).first()
+    if not offering:
+        raise HTTPException(status_code=404, detail="Course offering not found")
+    
+    # Check if teacher exists
+    teacher = db.query(User).filter(User.id == teacher_id).first()
+    if not teacher:
+        raise HTTPException(status_code=404, detail="Teacher not found")
+    
+    # Check if already assigned
+    existing = db.query(TeacherCourse).filter(
+        TeacherCourse.teacher_id == teacher_id,
+        TeacherCourse.course_offering_id == offering_id
+    ).first()
+    
+    if existing:
+        raise HTTPException(status_code=400, detail="Teacher already assigned to this course offering")
+    
+    teacher_course = TeacherCourse(teacher_id=teacher_id, course_offering_id=offering_id)
+    db.add(teacher_course)
+    db.commit()
+    db.refresh(teacher_course)
+    return teacher_course
+
+@router.delete("/offerings/{offering_id}/teachers/{teacher_id}")
+def remove_teacher_from_offering(
+    *,
+    db: Session = Depends(deps.get_db),
+    offering_id: int,
+    teacher_id: str,
+    current_user: User = Depends(deps.get_current_active_admin),
+) -> Any:
+    """
+    Remove a teacher from a course offering.
+    """
+    teacher_course = db.query(TeacherCourse).filter(
+        TeacherCourse.teacher_id == teacher_id,
+        TeacherCourse.course_offering_id == offering_id
+    ).first()
+    
+    if not teacher_course:
+        raise HTTPException(status_code=404, detail="Teacher assignment not found")
+    
+    db.delete(teacher_course)
+    db.commit()
+    return {"message": "Teacher removed from course offering"}
+
+@router.get("/offerings/{offering_id}/teachers", response_model=List[TeacherInfo])
+def list_teachers_for_offering(
+    *,
+    db: Session = Depends(deps.get_db),
+    offering_id: int,
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """
+    List all teachers assigned to a course offering.
+    """
+    offering = db.query(CourseOffering).filter(CourseOffering.id == offering_id).first()
+    if not offering:
+        raise HTTPException(status_code=404, detail="Course offering not found")
+    
+    teacher_assignments = db.query(TeacherCourse).filter(
+        TeacherCourse.course_offering_id == offering_id
+    ).all()
+    
+    results = []
+    for tc in teacher_assignments:
+        results.append(TeacherInfo(
+            id=tc.id,
+            teacher_id=tc.teacher_id,
+            teacher_name=tc.teacher.name
+        ))
+    
+    return results
