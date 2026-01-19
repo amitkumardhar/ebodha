@@ -11,7 +11,13 @@ app.add_middleware(LoggingMiddleware)
 
 @app.on_event("startup")
 async def startup_event():
+    # Initialize MongoDB
     await init_mongodb()
+    
+    # Create SQLAlchemy tables if they don't exist
+    from app.db.session import engine
+    from app.db.base import Base
+    Base.metadata.create_all(bind=engine)
 
 app.include_router(api_router, prefix=settings.API_V1_STR)
 

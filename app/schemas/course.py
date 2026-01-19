@@ -30,3 +30,12 @@ class CourseOffering(CourseOfferingBase):
     id: int
     class Config:
         orm_mode = True
+
+from app.schemas.report import ExamMarksReport
+
+class StudentCourseDetails(BaseModel):
+    student_id: str
+    student_name: str
+    grade: Optional[str]
+    grade_point: Optional[float]
+    marks: List[ExamMarksReport]

@@ -45,6 +45,101 @@ def create_course(
     db.refresh(course)
     return course
 
+@router.get("/semester-courses", response_model=List[CourseOfferingSchema])
+def read_semester_courses(
+    semester_id: int,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Retrieve courses for a semester based on user role.
+    Teachers see only their courses. Admins see all courses.
+    """
+    if current_user.current_role not in [UserRole.TEACHER, UserRole.ADMIN]:
+        raise HTTPException(
+            status_code=403, detail="Not authorized to access this endpoint"
+        )
+
+    if current_user.current_role == UserRole.ADMIN:
+        offerings = db.query(CourseOffering).filter(CourseOffering.semester_id == semester_id).all()
+    else:
+        # Teacher
+        offerings = (
+            db.query(CourseOffering)
+            .join(TeacherCourse)
+            .filter(
+                CourseOffering.semester_id == semester_id,
+                TeacherCourse.teacher_id == current_user.id
+            )
+            .all()
+        )
+    return offerings
+
+from app.schemas.course import StudentCourseDetails
+from app.models.examination import Registration
+from app.schemas.report import ExamMarksReport
+
+@router.get("/semester-course-details", response_model=List[StudentCourseDetails])
+def read_semester_course_details(
+    semester_id: int,
+    course_code: str,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Retrieve student details, grades, and marks for a specific course offering.
+    Teachers see only courses they are assigned to. Admins see all.
+    """
+    if current_user.current_role not in [UserRole.TEACHER, UserRole.ADMIN]:
+        raise HTTPException(
+            status_code=403, detail="Not authorized to access this endpoint"
+        )
+
+    # Find offering
+    offering = db.query(CourseOffering).filter(
+        CourseOffering.semester_id == semester_id,
+        CourseOffering.course_code == course_code
+    ).first()
+
+    if not offering:
+        raise HTTPException(status_code=404, detail="Course offering not found")
+
+    # Check permissions for Teacher
+    if current_user.current_role == UserRole.TEACHER:
+        is_assigned = db.query(TeacherCourse).filter(
+            TeacherCourse.teacher_id == current_user.id,
+            TeacherCourse.course_offering_id == offering.id
+        ).first()
+        if not is_assigned:
+             raise HTTPException(
+                status_code=403, detail="Not authorized to view details for this course"
+            )
+
+    # Fetch registrations
+    registrations = db.query(Registration).filter(
+        Registration.course_offering_id == offering.id
+    ).all()
+
+    results = []
+    for reg in registrations:
+        marks_list = []
+        for m in reg.marks:
+            marks_list.append(ExamMarksReport(
+                exam_name=m.examination.name,
+                max_marks=m.examination.max_marks,
+                marks_obtained=m.marks_obtained
+            ))
+        
+        results.append(StudentCourseDetails(
+            student_id=reg.student_id,
+            student_name=reg.student.name,
+            grade=reg.grade,
+            grade_point=reg.grade_point,
+            marks=marks_list
+        ))
+        
+    return results
+
 @router.get("/offerings/", response_model=List[CourseOfferingSchema])
 def read_course_offerings(
     semester_id: int,
