@@ -185,8 +185,18 @@ async def bulk_upload_course_offerings(
     decoded_content = content.decode('utf-8')
     csv_reader = csv.DictReader(io.StringIO(decoded_content))
     
+    # Get all column headers
+    fieldnames = csv_reader.fieldnames
+    if not fieldnames:
+        raise HTTPException(status_code=400, detail="CSV file is empty or has no headers")
+    
+    # Identify exam columns (all columns except known reserved columns)
+    reserved_columns = {'course_code', 'semester_id', 'course_name', 'category', 'credits', 'teacher_ids'}
+    exam_columns = [col for col in fieldnames if col not in reserved_columns]
+    
     courses_created = 0
     offerings_created = 0
+    exams_created = 0
     errors = []
     
     for row_idx, row in enumerate(csv_reader):
@@ -225,7 +235,7 @@ async def bulk_upload_course_offerings(
                     errors.append(f"Row {row_idx}: Course {course_code} not found and details not provided")
                     continue
             
-            # Create Offering
+            # Create Offering if it does not exist
             offering = db.query(CourseOffering).filter(
                 CourseOffering.course_code == course_code,
                 CourseOffering.semester_id == semester_id
@@ -255,24 +265,39 @@ async def bulk_upload_course_offerings(
                             tc = TeacherCourse(teacher_id=tid, course_offering_id=offering.id)
                             db.add(tc)
             
-            # Create Exams
-            if 'exams' in row and row['exams']:
-                exams = row['exams'].split(';')
-                for exam_str in exams:
-                    if ':' in exam_str:
-                        name, max_marks = exam_str.split(':')
-                        # Check if exam exists
-                        exam = db.query(Examination).filter(
-                            Examination.course_offering_id == offering.id,
-                            Examination.name == name.strip()
-                        ).first()
-                        if not exam:
-                            exam = Examination(
-                                course_offering_id=offering.id,
-                                name=name.strip(),
-                                max_marks=float(max_marks)
-                            )
-                            db.add(exam)
+            # Process exam columns
+            for exam_name in exam_columns:
+                max_marks_str = row.get(exam_name, '').strip()
+                
+                # Skip if empty or zero
+                if not max_marks_str or max_marks_str == '0':
+                    continue
+                
+                try:
+                    max_marks = float(max_marks_str)
+                    if max_marks <= 0:
+                        continue
+                except ValueError:
+                    errors.append(f"Row {row_idx}: Invalid max_marks '{max_marks_str}' for exam '{exam_name}'")
+                    continue
+                
+                # Check if exam already exists
+                exam = db.query(Examination).filter(
+                    Examination.course_offering_id == offering.id,
+                    Examination.name == exam_name
+                ).first()
+                
+                if not exam:
+                    exam = Examination(
+                        course_offering_id=offering.id,
+                        name=exam_name,
+                        max_marks=max_marks
+                    )
+                    db.add(exam)
+                    exams_created += 1
+                else:
+                    # Update max_marks if exam already exists
+                    exam.max_marks = max_marks
 
         except Exception as e:
             errors.append(f"Row {row_idx}: {str(e)}")
@@ -282,6 +307,7 @@ async def bulk_upload_course_offerings(
     return {
         "courses_created": courses_created,
         "offerings_created": offerings_created,
+        "exams_created": exams_created,
         "errors": errors
     }
 

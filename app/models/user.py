@@ -19,8 +19,10 @@ class User(Base):
     email = Column(String, index=True)
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
+    discipline_code = Column(String, ForeignKey("discipline.code"), nullable=True)
     
     roles = relationship("UserRoleEntry", back_populates="user", cascade="all, delete-orphan")
+    discipline = relationship("Discipline")
 
 class UserRoleEntry(Base):
     id = Column(Integer, primary_key=True, index=True)

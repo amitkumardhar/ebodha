@@ -26,6 +26,7 @@ class UserCreate(UserBase):
 class UserUpdate(UserBase):
     password: Optional[str] = None
     roles: Optional[List[UserRole]] = None
+    discipline_code: Optional[str] = None
 
 class UserPasswordUpdate(BaseModel):
     current_password: str
