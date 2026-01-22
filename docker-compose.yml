@@ -19,6 +19,13 @@ services:
       mongo:
         condition: service_healthy
 
+#  frontend:
+#    build: ./frontend
+#    ports:
+#      - "8080:80"
+#    depends_on:
+#      - web
+
   db:
     image: postgres:13-alpine
     volumes:

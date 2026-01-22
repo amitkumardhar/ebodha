@@ -1,5 +1,6 @@
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.db.mongodb import init_mongodb
 from app.api.v1.api import api_router
@@ -8,6 +9,17 @@ from app.core.middleware import LoggingMiddleware
 app = FastAPI(title=settings.PROJECT_NAME, openapi_url=f"{settings.API_V1_STR}/openapi.json")
 
 app.add_middleware(LoggingMiddleware)
+ 
+# Set all CORS enabled origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex="https?://.*",  # Allows all http and https origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
+
+
 
 @app.on_event("startup")
 async def startup_event():

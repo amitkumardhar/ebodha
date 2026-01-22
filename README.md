@@ -42,13 +42,14 @@ ebodha/
     docker-compose up --build
     ```
 
-    This command will start three containers:
+    This command will start four containers:
     *   `web`: The FastAPI backend (exposed on port 8000)
+    *   `frontend`: The Vue.js Frontend (exposed on port 8080)
     *   `db`: PostgreSQL database (exposed on port 5432)
     *   `mongo`: MongoDB database (exposed on port 27017)
 
-3.  **Access the API Documentation**:
-    Once the services are running, open your browser and navigate to:
+3.  **Access the Application**:
+    *   **Frontend**: [http://localhost:8080](http://localhost:8080)
     *   **Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
     *   **ReDoc**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
 

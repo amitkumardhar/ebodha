@@ -11,6 +11,16 @@ from app.schemas.user import User as UserSchema, UserCreate, UserUpdate
 
 router = APIRouter()
 
+@router.get("/me", response_model=UserSchema)
+def read_user_me(
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Get current user.
+    """
+    return current_user
+
 @router.get("/", response_model=List[UserSchema])
 def read_users(
     db: Session = Depends(deps.get_db),
