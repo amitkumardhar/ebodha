@@ -18,18 +18,18 @@
                 {{ auth.currentRole?.toUpperCase() }}
             </v-list-item-subtitle>
         </v-list-item>
+      <template v-if="availableRoles.length > 0">
         <v-divider class="my-1"></v-divider>
-      
-      <v-list-subheader class="text-caption text-uppercase">Switch Role</v-list-subheader>
-      
-      <v-list-item
-        v-for="role in availableRoles"
-        :key="role"
-        @click="switchRole(role)"
-        link
-      >
-        <v-list-item-title class="text-body-2">{{ role.toUpperCase() }}</v-list-item-title>
-      </v-list-item>
+        <v-list-subheader class="text-caption text-uppercase">Switch Role</v-list-subheader>
+        <v-list-item
+          v-for="role in availableRoles"
+          :key="role"
+          @click="switchRole(role)"
+          link
+        >
+          <v-list-item-title class="text-body-2">{{ role.toUpperCase() }}</v-list-item-title>
+        </v-list-item>
+      </template>
 
       <v-divider class="my-1"></v-divider>
       <v-list-item @click="logout" link>

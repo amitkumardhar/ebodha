@@ -10,7 +10,7 @@
     <v-select
         v-model="selectedSemester"
         :items="semesters"
-        item-title="id"
+        item-title="name"
         item-value="id"
         label="Select Semester"
         variant="outlined"
@@ -18,10 +18,10 @@
         class="mb-6"
     >
         <template v-slot:item="{ props, item }">
-            <v-list-item v-bind="props" :title="`Semester ${item.raw.id}`"></v-list-item>
+            <v-list-item v-bind="props" :title="item.raw.name || `Semester ${item.raw.id}`"></v-list-item>
         </template>
         <template v-slot:selection="{ item }">
-             Semester {{ item.raw.id }}
+             {{ item.raw.name || `Semester ${item.raw.id}` }}
         </template>
     </v-select>
 
@@ -38,8 +38,8 @@
                         :active="selectedCourse?.id === course.id"
                         color="primary"
                     >
-                        <v-list-item-title class="font-weight-bold">{{ course.course_code }}</v-list-item-title>
-                        <v-list-item-subtitle>ID: {{ course.id }}</v-list-item-subtitle>
+                        <v-list-item-title class="font-weight-bold">{{ course.course?.name || course.course_code }}</v-list-item-title>
+                        <v-list-item-subtitle>{{ course.course_code }}</v-list-item-subtitle>
                     </v-list-item>
                     <v-list-item v-if="courses.length === 0">No courses found</v-list-item>
                 </v-list>
@@ -50,7 +50,7 @@
             <v-card border flat v-if="selectedCourse">
                 <v-toolbar flat density="compact" class="border-b">
                     <v-toolbar-title class="text-body-1 font-weight-bold">
-                        {{ selectedCourse.course_code }} Details
+                        {{ selectedCourse.course?.name || selectedCourse.course_code }} Details
                     </v-toolbar-title>
                     <v-spacer></v-spacer>
                     <v-menu>

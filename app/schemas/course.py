@@ -36,6 +36,7 @@ class CourseOfferingCreate(CourseOfferingBase):
 
 class CourseOffering(CourseOfferingBase):
     id: int
+    course: Optional[Course] = None
     class Config:
         orm_mode = True
 

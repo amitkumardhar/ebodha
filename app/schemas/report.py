@@ -3,6 +3,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 class ExamMarksReport(BaseModel):
+    examination_id: int
     exam_name: str
     max_marks: float
     marks_obtained: float

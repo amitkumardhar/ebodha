@@ -83,7 +83,7 @@ export const useAuthStore = defineStore('auth', {
     },
     async switchRole(newRole) {
       try {
-        const response = await axios.post(`${API_URL}/login/switch-role?new_role=${newRole}`, {}, {
+        const response = await axios.post(`${API_URL}/switch-role?new_role=${newRole}`, {}, {
           headers: { Authorization: `Bearer ${this.token}` }
         })
 

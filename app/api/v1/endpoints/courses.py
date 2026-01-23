@@ -125,10 +125,14 @@ def read_semester_course_details(
         marks_list = []
         for m in reg.marks:
             marks_list.append(ExamMarksReport(
+                examination_id=m.examination_id,
                 exam_name=m.examination.name,
                 max_marks=m.examination.max_marks,
                 marks_obtained=m.marks_obtained
             ))
+        
+        # Sort marks by examination_id
+        marks_list.sort(key=lambda x: x.examination_id)
         
         results.append(StudentCourseDetails(
             registration_id=reg.id,

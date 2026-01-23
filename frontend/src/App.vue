@@ -1,15 +1,21 @@
 <template>
   <v-app>
     <v-app-bar app flat border v-if="!isLoginPage">
-      <v-app-bar-title class="text-h6 font-weight-black tracking-wide">
-        E-BODHA
-      </v-app-bar-title>
-      <v-spacer></v-spacer>
-      <AccountMenu />
+      <v-container class="d-flex align-center py-0 fill-height" style="max-width: 1200px;">
+        <v-app-bar-title class="text-h6 font-weight-black tracking-wide">
+          E-Bodha
+        </v-app-bar-title>
+        <v-spacer></v-spacer>
+        <AccountMenu />
+      </v-container>
     </v-app-bar>
 
     <v-main>
-      <v-container fluid class="pa-0 fill-height">
+      <v-container 
+        class="pa-0 mx-auto" 
+        :class="{ 'fill-height': isLoginPage, 'mt-6': !isLoginPage }"
+        style="max-width: 1200px;"
+      >
         <router-view></router-view>
       </v-container>
     </v-main>
