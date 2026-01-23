@@ -12,6 +12,7 @@ class UserBase(BaseModel):
     email: Optional[EmailStr] = None
     # role: UserRole  <-- Removed single role
     is_active: Optional[bool] = True
+    discipline_code: Optional[str] = None
 
 class UserRoleEntry(BaseModel):
     role: UserRole

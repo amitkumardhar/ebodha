@@ -14,6 +14,14 @@ class CourseBase(BaseModel):
 class CourseCreate(CourseBase):
     code: str
 
+class CourseUpdate(BaseModel):
+    name: Optional[str] = None
+    category: Optional[CourseCategory] = None
+    lecture_credits: Optional[int] = None
+    tutorial_credits: Optional[int] = None
+    practice_credits: Optional[int] = None
+    is_active: Optional[bool] = None
+
 class Course(CourseBase):
     code: str
     class Config:

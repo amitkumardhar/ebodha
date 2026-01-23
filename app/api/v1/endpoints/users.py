@@ -235,3 +235,51 @@ async def bulk_upload_users(
         "errors": errors
     }
 
+
+@router.put("/{user_id}", response_model=UserSchema)
+def update_user(
+    *,
+    db: Session = Depends(deps.get_db),
+    user_id: str,
+    user_in: UserUpdate,
+    current_user: User = Depends(deps.get_current_active_admin),
+) -> Any:
+    """
+    Update a user.
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    update_data = user_in.dict(exclude_unset=True)
+    if update_data.get("password"):
+        hashed_password = security.get_password_hash(update_data["password"])
+        del update_data["password"]
+        update_data["hashed_password"] = hashed_password
+        
+    for field, value in update_data.items():
+        setattr(user, field, value)
+        
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+@router.delete("/{user_id}")
+def delete_user(
+    *,
+    db: Session = Depends(deps.get_db),
+    user_id: str,
+    current_user: User = Depends(deps.get_current_active_admin),
+) -> Any:
+    """
+    Deactivate a user.
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    user.is_active = False
+    db.add(user)
+    db.commit()
+    return {"message": "User deactivated successfully"}

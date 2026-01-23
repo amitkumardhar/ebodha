@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.api import deps
 from app.models.academic import Semester, CalendarEvent
 from app.models.user import User
-from app.schemas.academic import Semester as SemesterSchema, SemesterCreate, CalendarEvent as CalendarEventSchema, CalendarEventCreate
+from app.schemas.academic import Semester as SemesterSchema, SemesterCreate, SemesterUpdate, CalendarEvent as CalendarEventSchema, CalendarEventCreate
 
 router = APIRouter()
 
@@ -54,3 +54,53 @@ def create_calendar_event(
     db.commit()
     db.refresh(event)
     return event
+
+
+
+@router.put("/semesters/{semester_id}", response_model=SemesterSchema)
+def update_semester(
+    *,
+    db: Session = Depends(deps.get_db),
+    semester_id: int,
+    semester_in: SemesterUpdate,
+    current_user: User = Depends(deps.get_current_active_admin),
+) -> Any:
+    """
+    Update a semester.
+    """
+    semester = db.query(Semester).filter(Semester.id == semester_id).first()
+    if not semester:
+        raise HTTPException(status_code=404, detail="Semester not found")
+    
+    update_data = semester_in.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(semester, field, value)
+        
+    db.add(semester)
+    db.commit()
+    db.refresh(semester)
+    return semester
+
+@router.delete("/semesters/{semester_id}")
+def delete_semester(
+    *,
+    db: Session = Depends(deps.get_db),
+    semester_id: int,
+    current_user: User = Depends(deps.get_current_active_admin),
+) -> Any:
+    """
+    Delete a semester.
+    """
+    semester = db.query(Semester).filter(Semester.id == semester_id).first()
+    if not semester:
+        raise HTTPException(status_code=404, detail="Semester not found")
+    
+    # Check for dependencies (offerings)
+    from app.models.course import CourseOffering
+    offerings = db.query(CourseOffering).filter(CourseOffering.semester_id == semester_id).first()
+    if offerings:
+        raise HTTPException(status_code=400, detail="Cannot delete semester with existing offerings")
+        
+    db.delete(semester)
+    db.commit()
+    return {"message": "Semester deleted successfully"}

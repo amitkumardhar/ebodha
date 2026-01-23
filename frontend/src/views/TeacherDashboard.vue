@@ -75,8 +75,16 @@
                     density="compact"
                 >
                     <template v-slot:item.marks="{ item }">
-                        <div v-for="mark in item.marks" :key="mark.exam_name" class="text-caption">
-                            {{ mark.exam_name }}: {{ mark.marks_obtained }}/{{ mark.max_marks }}
+                        <div v-for="mark in item.marks" :key="mark.exam_name" class="d-flex align-center text-caption mb-1">
+                            <span>{{ mark.exam_name }}: {{ mark.marks_obtained }}/{{ mark.max_marks }}</span>
+                            <v-btn 
+                                icon="mdi-pencil" 
+                                size="x-small" 
+                                variant="text" 
+                                density="compact" 
+                                class="ml-1 text-medium-emphasis" 
+                                @click="openEditMarkDialog(item, mark)"
+                            ></v-btn>
                         </div>
                     </template>
                 </v-data-table>
@@ -110,6 +118,26 @@
             </v-card-actions>
         </v-card>
     </v-dialog>
+    <v-dialog v-model="editMarkDialog" max-width="400">
+        <v-card>
+            <v-card-title>Edit Mark</v-card-title>
+            <v-card-text>
+                <div class="text-subtitle-1 mb-2">{{ editMarkData.student_name }} - {{ editMarkData.exam_name }}</div>
+                <v-text-field
+                    v-model.number="editMarkData.marks"
+                    label="Marks Obtained"
+                    type="number"
+                    variant="outlined"
+                    autofocus
+                ></v-text-field>
+            </v-card-text>
+            <v-card-actions>
+                <v-spacer></v-spacer>
+                <v-btn variant="text" @click="editMarkDialog = false">Cancel</v-btn>
+                <v-btn color="primary" @click="saveMark" :loading="savingMark">Save</v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
 
     <v-snackbar v-model="snackbar.show" :color="snackbar.color">
         {{ snackbar.text }}
@@ -135,6 +163,15 @@ const uploadType = ref('marks')
 const uploadFile = ref(null)
 const uploading = ref(false)
 const snackbar = ref({ show: false, text: '', color: 'success' })
+
+const editMarkDialog = ref(false)
+const editMarkData = ref({
+    student_id: '',
+    student_name: '',
+    exam_name: '',
+    marks: 0
+})
+const savingMark = ref(false)
 
 const studentHeaders = [
     { title: 'Student ID', key: 'student_id' },
@@ -212,6 +249,40 @@ const handleUpload = async () => {
         snackbar.value = { show: true, text: 'Upload failed: ' + (e.response?.data?.detail || e.message), color: 'error' }
     } finally {
         uploading.value = false
+    }
+}
+
+const openEditMarkDialog = (item, mark) => {
+    editMarkData.value = {
+        student_id: item.student_id,
+        student_name: item.student_name,
+        exam_name: mark.exam_name,
+        marks: mark.marks_obtained
+    }
+    editMarkDialog.value = true
+}
+
+const saveMark = async () => {
+    savingMark.value = true
+    try {
+        await axios.put('http://localhost:8000/api/v1/examinations/marks', {
+            course_code: selectedCourse.value.course_code,
+            semester_id: selectedSemester.value,
+            student_id: editMarkData.value.student_id,
+            exam_name: editMarkData.value.exam_name,
+            marks: editMarkData.value.marks
+        }, {
+            headers: { Authorization: `Bearer ${auth.token}` }
+        })
+        
+        snackbar.value = { show: true, text: 'Mark updated successfully', color: 'success' }
+        editMarkDialog.value = false
+        // Refresh details
+        selectCourse(selectedCourse.value)
+    } catch (e) {
+        snackbar.value = { show: true, text: 'Update failed: ' + (e.response?.data?.detail || e.message), color: 'error' }
+    } finally {
+        savingMark.value = false
     }
 }
 

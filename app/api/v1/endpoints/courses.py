@@ -399,3 +399,52 @@ def list_teachers_for_offering(
         ))
     
     return results
+
+from app.schemas.course import CourseUpdate
+
+@router.put("/{course_code}", response_model=CourseSchema)
+def update_course(
+    *,
+    db: Session = Depends(deps.get_db),
+    course_code: str,
+    course_in: CourseUpdate,
+    current_user: User = Depends(deps.get_current_active_admin),
+) -> Any:
+    """
+    Update a course.
+    """
+    course = db.query(Course).filter(Course.code == course_code).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    update_data = course_in.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(course, field, value)
+        
+    db.add(course)
+    db.commit()
+    db.refresh(course)
+    return course
+
+@router.delete("/{course_code}")
+def delete_course(
+    *,
+    db: Session = Depends(deps.get_db),
+    course_code: str,
+    current_user: User = Depends(deps.get_current_active_admin),
+) -> Any:
+    """
+    Delete a course.
+    """
+    course = db.query(Course).filter(Course.code == course_code).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+    
+    # Check for dependencies (offerings)
+    offerings = db.query(CourseOffering).filter(CourseOffering.course_code == course_code).first()
+    if offerings:
+        raise HTTPException(status_code=400, detail="Cannot delete course with existing offerings")
+        
+    db.delete(course)
+    db.commit()
+    return {"message": "Course deleted successfully"}

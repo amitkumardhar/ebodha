@@ -65,3 +65,10 @@ class CompartmentRegistration(CompartmentRegistrationBase):
 
 class CompartmentGradeUpdate(BaseModel):
     grade: str
+
+class MarkUpdate(BaseModel):
+    course_code: str
+    semester_id: int
+    student_id: str
+    exam_name: str
+    marks: float

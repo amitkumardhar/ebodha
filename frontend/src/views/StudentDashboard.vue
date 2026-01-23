@@ -6,7 +6,7 @@
             <div class="text-subtitle-1 text-medium-emphasis mt-1">
                 Welcome, {{ auth.user?.name }} 
                 <span v-if="auth.user?.discipline_code" class="text-caption font-weight-medium ml-2 text-uppercase border px-2 rounded">
-                    {{ auth.user.discipline_code }}
+                    {{ disciplineName || auth.user.discipline_code }}
                 </span>
             </div>
         </div>
@@ -24,7 +24,7 @@
         :key="semester.id"
       >
         <v-expansion-panel-title class="text-h6">
-            Semester {{ semester.id }}
+            {{ getSemesterName(semester.id) }}
             <template v-slot:actions="{ expanded }">
                 <v-icon :icon="expanded ? 'mdi-minus' : 'mdi-plus'"></v-icon>
             </template>
@@ -81,13 +81,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import axios from 'axios'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
 const loading = ref(true)
 const report = ref([])
+const disciplineName = ref('')
+const semesters = ref([])
 
 const fetchReport = async () => {
     loading.value = true
@@ -101,6 +103,41 @@ const fetchReport = async () => {
     } finally {
         loading.value = false
     }
+}
+
+const fetchDiscipline = async () => {
+    if (!auth.user?.discipline_code) return
+    try {
+        const response = await axios.get(`http://localhost:8000/api/v1/disciplines/${auth.user.discipline_code}`, {
+            headers: { Authorization: `Bearer ${auth.token}` }
+        })
+        disciplineName.value = response.data.name
+    } catch (e) {
+        console.error('Failed to fetch discipline name', e)
+    }
+}
+
+const fetchSemesters = async () => {
+    try {
+        const response = await axios.get('http://localhost:8000/api/v1/academic/semesters/', {
+            headers: { Authorization: `Bearer ${auth.token}` }
+        })
+        semesters.value = response.data
+    } catch (e) {
+        console.error('Failed to fetch semesters', e)
+    }
+}
+
+const getSemesterName = (id) => {
+    const sem = semesters.value.find(s => s.id === id)
+    // Assuming semester object has a name field, or we construct it from type/year/dates
+    // Let's check what the semester object looks like. 
+    // Usually it has id, type, year, start_date, end_date.
+    // If it doesn't have a name, we might need to construct it.
+    // But the user said "All semester name with semester id can be obtained".
+    // So I assume there is a 'name' field or similar.
+    // If not, I'll fallback to ID.
+    return sem ? (sem.name || `Semester ${sem.id}`) : `Semester ${id}`
 }
 
 const groupedData = computed(() => {
@@ -121,5 +158,12 @@ const groupedData = computed(() => {
 
 onMounted(() => {
     fetchReport()
+    fetchDiscipline()
+    fetchSemesters()
+})
+
+// Watch for user changes (e.g. on refresh/late load)
+watch(() => auth.user, () => {
+    fetchDiscipline()
 })
 </script>

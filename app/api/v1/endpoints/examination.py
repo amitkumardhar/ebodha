@@ -126,3 +126,62 @@ async def bulk_upload_marks(
         "exams_processed": list(exams_processed),
         "errors": errors
     }
+
+from app.schemas.examination import MarkUpdate
+
+@router.put("/marks", response_model=Any)
+def update_marks(
+    *,
+    db: Session = Depends(deps.get_db),
+    mark_in: MarkUpdate,
+    current_user: User = Depends(deps.get_current_active_teacher),
+) -> Any:
+    """
+    Update marks for a specific student and exam.
+    """
+    # Verify offering
+    offering = db.query(CourseOffering).filter(
+        CourseOffering.course_code == mark_in.course_code,
+        CourseOffering.semester_id == mark_in.semester_id
+    ).first()
+    
+    if not offering:
+        raise HTTPException(status_code=404, detail="Course offering not found")
+        
+    # Verify registration
+    registration = db.query(Registration).filter(
+        Registration.student_id == mark_in.student_id,
+        Registration.course_offering_id == offering.id
+    ).first()
+    
+    if not registration:
+        raise HTTPException(status_code=404, detail="Registration not found")
+        
+    # Verify examination
+    exam = db.query(Examination).filter(
+        Examination.course_offering_id == offering.id,
+        Examination.name == mark_in.exam_name
+    ).first()
+    
+    if not exam:
+        raise HTTPException(status_code=404, detail="Examination not found")
+        
+    # Update/Create Marks
+    marks = db.query(Marks).filter(
+        Marks.registration_id == registration.id,
+        Marks.examination_id == exam.id
+    ).first()
+    
+    if marks:
+        marks.marks_obtained = mark_in.marks
+    else:
+        marks = Marks(
+            registration_id=registration.id,
+            examination_id=exam.id,
+            marks_obtained=mark_in.marks
+        )
+        db.add(marks)
+        
+    db.commit()
+    
+    return {"message": "Marks updated successfully"}

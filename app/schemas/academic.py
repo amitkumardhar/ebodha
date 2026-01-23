@@ -26,6 +26,13 @@ class SemesterBase(BaseModel):
 class SemesterCreate(SemesterBase):
     pass
 
+class SemesterUpdate(BaseModel):
+    name: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    is_active: Optional[bool] = None
+
+
 class Semester(SemesterBase):
     id: int
     calendar_events: List[CalendarEvent] = []
