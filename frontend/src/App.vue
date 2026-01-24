@@ -2,11 +2,17 @@
   <v-app>
     <v-app-bar app flat border v-if="!isLoginPage">
       <v-container class="d-flex align-center py-0 fill-height" style="max-width: 1200px;">
-        <v-app-bar-title class="text-h6 font-weight-black tracking-wide">
-          E-Bodha
-        </v-app-bar-title>
-        <v-spacer></v-spacer>
-        <AccountMenu />
+        <div class="d-flex align-center" style="flex: 1;">
+            <div class="text-h6 font-weight-black tracking-wide">E-Bodha</div>
+        </div>
+        
+        <div class="d-flex align-center">
+            <v-img src="/logo.png" width="40" contain></v-img>
+        </div>
+
+        <div class="d-flex justify-end" style="flex: 1;">
+            <AccountMenu />
+        </div>
       </v-container>
     </v-app-bar>
 
@@ -19,6 +25,12 @@
         <router-view></router-view>
       </v-container>
     </v-main>
+
+    <v-footer app border height="40" class="justify-center">
+        <div class="text-caption text-medium-emphasis">
+            Made at IIT Bhilai
+        </div>
+    </v-footer>
   </v-app>
 </template>
 

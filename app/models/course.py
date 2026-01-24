@@ -40,3 +40,7 @@ class TeacherCourse(Base):
     
     course_offering = relationship("CourseOffering", back_populates="teachers")
     teacher = relationship("User")
+
+    @property
+    def teacher_name(self) -> str:
+        return self.teacher.name if self.teacher else ""

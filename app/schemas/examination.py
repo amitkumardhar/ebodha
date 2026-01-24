@@ -23,6 +23,11 @@ class ExaminationBase(BaseModel):
 class ExaminationCreate(ExaminationBase):
     course_offering_id: int
 
+class ExaminationUpdate(BaseModel):
+    name: Optional[str] = None
+    max_marks: Optional[float] = None
+    date: Optional[date] = None
+
 class Examination(ExaminationBase):
     id: int
     course_offering_id: int

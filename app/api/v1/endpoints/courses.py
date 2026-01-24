@@ -173,6 +173,54 @@ def create_course_offering(
     db.refresh(offering)
     return offering
 
+from app.schemas.course import CourseOfferingUpdate
+
+@router.put("/offerings/{offering_id}", response_model=CourseOfferingSchema)
+def update_course_offering(
+    *,
+    db: Session = Depends(deps.get_db),
+    offering_id: int,
+    offering_in: CourseOfferingUpdate,
+    current_user: User = Depends(deps.get_current_active_admin),
+) -> Any:
+    """
+    Update a course offering.
+    """
+    offering = db.query(CourseOffering).filter(CourseOffering.id == offering_id).first()
+    if not offering:
+        raise HTTPException(status_code=404, detail="Course offering not found")
+    
+    update_data = offering_in.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(offering, field, value)
+        
+    db.add(offering)
+    db.commit()
+    db.refresh(offering)
+    return offering
+
+@router.delete("/offerings/{offering_id}")
+def delete_course_offering(
+    *,
+    db: Session = Depends(deps.get_db),
+    offering_id: int,
+    current_user: User = Depends(deps.get_current_active_admin),
+) -> Any:
+    """
+    Delete a course offering.
+    """
+    offering = db.query(CourseOffering).filter(CourseOffering.id == offering_id).first()
+    if not offering:
+        raise HTTPException(status_code=404, detail="Course offering not found")
+    
+    # Check for dependencies (registrations, examinations, teachers)
+    if offering.registrations or offering.examinations or offering.teachers:
+        raise HTTPException(status_code=400, detail="Cannot delete course offering with existing registrations or exams")
+        
+    db.delete(offering)
+    db.commit()
+    return {"message": "Course offering deleted successfully"}
+
 @router.post("/offerings/bulk-upload")
 async def bulk_upload_course_offerings(
     file: UploadFile = File(...),

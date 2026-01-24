@@ -55,6 +55,50 @@ def create_calendar_event(
     db.refresh(event)
     return event
 
+from app.schemas.academic import CalendarEventUpdate
+
+@router.put("/events/{event_id}", response_model=CalendarEventSchema)
+def update_calendar_event(
+    *,
+    db: Session = Depends(deps.get_db),
+    event_id: int,
+    event_in: CalendarEventUpdate,
+    current_user: User = Depends(deps.get_current_active_admin),
+) -> Any:
+    """
+    Update a calendar event.
+    """
+    event = db.query(CalendarEvent).filter(CalendarEvent.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Calendar event not found")
+    
+    update_data = event_in.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(event, field, value)
+        
+    db.add(event)
+    db.commit()
+    db.refresh(event)
+    return event
+
+@router.delete("/events/{event_id}")
+def delete_calendar_event(
+    *,
+    db: Session = Depends(deps.get_db),
+    event_id: int,
+    current_user: User = Depends(deps.get_current_active_admin),
+) -> Any:
+    """
+    Delete a calendar event.
+    """
+    event = db.query(CalendarEvent).filter(CalendarEvent.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Calendar event not found")
+        
+    db.delete(event)
+    db.commit()
+    return {"message": "Calendar event deleted"}
+
 
 
 @router.put("/semesters/{semester_id}", response_model=SemesterSchema)

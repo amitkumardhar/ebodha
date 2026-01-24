@@ -1,63 +1,76 @@
 <template>
-  <v-container class="fill-height justify-center bg-background">
-    <v-card width="400" flat border class="pa-4">
-        <div class="text-center mb-6">
-            <div class="text-h4 font-weight-bold mb-2">Login</div>
-            <div class="text-caption text-medium-emphasis">Enter your credentials to access the system</div>
-        </div>
+  <v-container class="fill-height justify-center align-center bg-background">
+    <div class="d-flex flex-column align-center" style="width: 400px;">
+      <v-img
+        src="/logo.png"
+        width="100"
+        class="mb-6"
+        contain
+      ></v-img>
 
-      <v-form @submit.prevent="handleLogin">
-        <v-text-field
-          v-model="username"
-          label="User ID"
-          variant="outlined"
-          density="comfortable"
-          hide-details="auto"
-          class="mb-4"
-        ></v-text-field>
+      <v-card width="100%" flat border class="pa-4">
+          <div class="text-center mb-6">
+              <div class="text-h4 font-weight-bold mb-2">Login</div>
+              <div class="text-caption text-medium-emphasis">Enter your credentials to access E-Bodha</div>
+          </div>
 
-        <v-text-field
-          v-model="password"
-          label="Password"
-          type="password"
-          variant="outlined"
-          density="comfortable"
-          hide-details="auto"
-          class="mb-4"
-        ></v-text-field>
-
-        <v-select
-            v-model="selectedRole"
-            :items="roles"
-            label="Role (Optional)"
+        <v-form @submit.prevent="handleLogin">
+          <v-text-field
+            v-model="username"
+            label="User ID"
             variant="outlined"
             density="comfortable"
             hide-details="auto"
-            class="mb-6"
-        ></v-select>
+            class="mb-4"
+          ></v-text-field>
 
-        <v-btn
-          type="submit"
-          block
-          color="primary"
-          height="48"
-          variant="flat"
-          :loading="loading"
-        >
-          Sign In
-        </v-btn>
-        
-        <v-alert
-            v-if="error"
-            type="error"
-            variant="tonal"
-            density="compact"
-            class="mt-4"
-        >
-            {{ error }}
-        </v-alert>
-      </v-form>
-    </v-card>
+          <v-text-field
+            v-model="password"
+            label="Password"
+            type="password"
+            variant="outlined"
+            density="comfortable"
+            hide-details="auto"
+            class="mb-4"
+          ></v-text-field>
+
+          <v-select
+              v-model="selectedRole"
+              :items="roles"
+              label="Role (Optional)"
+              variant="outlined"
+              density="comfortable"
+              hide-details="auto"
+              class="mb-6"
+          ></v-select>
+
+          <v-btn
+            type="submit"
+            block
+            color="primary"
+            height="48"
+            variant="flat"
+            :loading="loading"
+          >
+            Sign In
+          </v-btn>
+          
+          <v-alert
+              v-if="error"
+              type="error"
+              variant="tonal"
+              density="compact"
+              class="mt-4"
+          >
+              {{ error }}
+          </v-alert>
+        </v-form>
+      </v-card>
+
+      <div class="mt-8 text-caption text-medium-emphasis text-center">
+        Made at IIT Bhilai
+      </div>
+    </div>
   </v-container>
 </template>
 

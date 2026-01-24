@@ -252,10 +252,14 @@ def get_my_report(
         marks_list = []
         for m in reg.marks:
             marks_list.append(ExamMarksReport(
+                examination_id=m.examination_id,
                 exam_name=m.examination.name,
                 max_marks=m.examination.max_marks,
                 marks_obtained=m.marks_obtained
             ))
+        
+        # Sort marks by examination_id
+        marks_list.sort(key=lambda x: x.examination_id)
             
         # Get Compartment Grade
         compartment_reg = db.query(CompartmentRegistration).filter(

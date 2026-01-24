@@ -11,6 +11,11 @@ class CalendarEventBase(BaseModel):
 class CalendarEventCreate(CalendarEventBase):
     semester_id: int
 
+class CalendarEventUpdate(BaseModel):
+    name: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+
 class CalendarEvent(CalendarEventBase):
     id: int
     semester_id: int

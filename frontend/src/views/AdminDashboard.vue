@@ -11,7 +11,6 @@
         <v-tab value="users">Users</v-tab>
         <v-tab value="disciplines">Disciplines</v-tab>
         <v-tab value="semesters">Semesters</v-tab>
-        <v-tab value="semesters">Semesters</v-tab>
         <v-tab value="courses">Courses</v-tab>
         <v-tab value="offerings">Course Offerings</v-tab>
     </v-tabs>
@@ -50,13 +49,37 @@
                      <v-btn color="primary" prepend-icon="mdi-plus" @click="openUserDialog()">Add User</v-btn>
                 </div>
 
+                <v-text-field
+                    v-model="searchUsers"
+                    prepend-inner-icon="mdi-magnify"
+                    label="Search Users"
+                    variant="outlined"
+                    density="compact"
+                    hide-details
+                    class="mb-4"
+                    clearable
+                ></v-text-field>
+
                 <v-data-table
                     :headers="userHeaders"
                     :items="users"
                     :loading="loadingUsers"
+                    :search="searchUsers"
                     density="compact"
                     class="mb-6"
                 >
+                    <template v-slot:item.roles="{ item }">
+                        <v-chip
+                            v-for="roleEntry in item.roles"
+                            :key="roleEntry.role"
+                            size="x-small"
+                            class="mr-1 text-uppercase"
+                            color="secondary"
+                            variant="tonal"
+                        >
+                            {{ roleEntry.role }}
+                        </v-chip>
+                    </template>
                     <template v-slot:item.is_active="{ item }">
                         <v-chip size="x-small" :color="item.is_active ? 'success' : 'error'">
                             {{ item.is_active ? 'Active' : 'Inactive' }}
@@ -95,6 +118,12 @@
                     :loading="loadingSemesters"
                     density="compact"
                 >
+                    <template v-slot:item.calendar_events="{ item }">
+                        <div v-for="event in item.calendar_events" :key="event.id" class="text-caption">
+                            {{ event.name }} ({{ event.start_date }} - {{ event.end_date }})
+                        </div>
+                        <span v-if="!item.calendar_events?.length" class="text-caption text-medium-emphasis">No events</span>
+                    </template>
                     <template v-slot:item.actions="{ item }">
                         <v-btn icon="mdi-pencil" size="small" variant="text" @click="openSemesterDialog(item)"></v-btn>
                         <v-btn icon="mdi-delete" size="small" variant="text" color="error" @click="deleteSemester(item)"></v-btn>
@@ -109,11 +138,23 @@
                      <div class="text-h6">Courses</div>
                      <v-btn color="primary" prepend-icon="mdi-plus" @click="openCourseDialog()">Add Course</v-btn>
                 </div>
+
+                <v-text-field
+                    v-model="searchCourses"
+                    prepend-inner-icon="mdi-magnify"
+                    label="Search Courses"
+                    variant="outlined"
+                    density="compact"
+                    hide-details
+                    class="mb-4"
+                    clearable
+                ></v-text-field>
                 
                 <v-data-table
                     :headers="courseHeaders"
                     :items="courses"
                     :loading="loadingCourses"
+                    :search="searchCourses"
                     density="compact"
                 >
                     <template v-slot:item.credits="{ item }">
@@ -128,6 +169,83 @@
         </v-window-item>
 
         <v-window-item value="offerings">
+             <v-card border flat class="pa-4 mb-4">
+                <div class="text-h6 mb-4">Course Offerings Management</div>
+                
+                <v-row class="mb-4">
+                    <v-col cols="12" md="6">
+                        <v-select
+                            v-model="selectedOfferingSemester"
+                            :items="semesters"
+                            item-title="name"
+                            item-value="id"
+                            label="Filter by Semester"
+                            variant="outlined"
+                            density="compact"
+                            hide-details
+                            @update:model-value="fetchOfferings"
+                        ></v-select>
+                    </v-col>
+                    <v-col cols="12" md="6" class="text-right">
+                        <v-btn 
+                            color="primary" 
+                            prepend-icon="mdi-plus" 
+                            @click="openOfferingDialog()"
+                            :disabled="!selectedOfferingSemester"
+                        >
+                            Add Offering
+                        </v-btn>
+                    </v-col>
+                </v-row>
+
+                <v-text-field
+                    v-if="selectedOfferingSemester"
+                    v-model="searchOfferings"
+                    prepend-inner-icon="mdi-magnify"
+                    label="Search Offerings"
+                    variant="outlined"
+                    density="compact"
+                    hide-details
+                    class="mb-4"
+                    clearable
+                ></v-text-field>
+
+                <v-data-table
+                    v-if="selectedOfferingSemester"
+                    :headers="offeringHeaders"
+                    :items="offerings"
+                    :loading="loadingOfferings"
+                    :search="searchOfferings"
+                    density="compact"
+                >
+                    <template v-slot:item.examinations="{ item }">
+                        <v-chip
+                            v-for="exam in item.examinations"
+                            :key="exam.id || exam.name"
+                            size="x-small"
+                            class="mr-1 mb-1"
+                            variant="outlined"
+                        >
+                            {{ exam.name }} ({{ exam.max_marks }})
+                        </v-chip>
+                        <span v-if="!item.examinations?.length" class="text-caption text-medium-emphasis">No exams</span>
+                    </template>
+                    <template v-slot:item.teachers="{ item }">
+                        <div v-for="teacher in item.teachers" :key="teacher.teacher_id" class="text-caption">
+                            {{ teacher.teacher_name }}
+                        </div>
+                        <span v-if="!item.teachers?.length" class="text-caption text-medium-emphasis">No teachers</span>
+                    </template>
+                    <template v-slot:item.actions="{ item }">
+                        <v-btn icon="mdi-pencil" size="small" variant="text" @click="openOfferingDialog(item)"></v-btn>
+                        <v-btn icon="mdi-delete" size="small" variant="text" color="error" @click="deleteOffering(item)"></v-btn>
+                    </template>
+                </v-data-table>
+                <div v-else class="text-center py-10 text-medium-emphasis">
+                    Please select a semester to manage course offerings
+                </div>
+            </v-card>
+
              <v-card border flat class="pa-4">
                 <div class="text-h6 mb-4">Bulk Upload Course Offerings</div>
                 <v-file-input
@@ -204,11 +322,11 @@
                     type="password"
                 ></v-text-field>
                 <v-select
-                    v-model="userData.role"
-                    :items="['student', 'teacher', 'admin', 'alumni']"
-                    label="Role"
+                    v-model="userData.roles"
+                    :items="['student', 'teacher', 'administrator', 'alumni']"
+                    label="Roles"
                     variant="outlined"
-                    :disabled="editingUser" 
+                    multiple
                 ></v-select>
                 <v-text-field
                     v-if="userData.role === 'student'"
@@ -292,30 +410,249 @@
         <v-card>
             <v-card-title>{{ editingSemester ? 'Edit Semester' : 'Add Semester' }}</v-card-title>
             <v-card-text>
-                <v-text-field
-                    v-if="!editingSemester"
-                    v-model.number="semesterData.id"
-                    label="Semester ID"
-                    type="number"
-                    variant="outlined"
-                ></v-text-field>
-                <v-text-field
-                    v-model="semesterData.start_date"
-                    label="Start Date"
-                    type="date"
-                    variant="outlined"
-                ></v-text-field>
-                <v-text-field
-                    v-model="semesterData.end_date"
-                    label="End Date"
-                    type="date"
-                    variant="outlined"
-                ></v-text-field>
+                <v-row>
+                    <v-col cols="6">
+                        <v-text-field
+                            v-if="!editingSemester"
+                            v-model.number="semesterData.id"
+                            label="Semester ID"
+                            type="number"
+                            variant="outlined"
+                            density="compact"
+                        ></v-text-field>
+                    </v-col>
+                    <v-col cols="6">
+                        <v-text-field
+                            v-model="semesterData.name"
+                            label="Semester Name"
+                            variant="outlined"
+                            density="compact"
+                            placeholder="e.g. Autumn 2025"
+                        ></v-text-field>
+                    </v-col>
+                </v-row>
+                <v-row>
+                    <v-col cols="6">
+                        <v-text-field
+                            v-model="semesterData.start_date"
+                            label="Start Date"
+                            type="date"
+                            variant="outlined"
+                            density="compact"
+                        ></v-text-field>
+                    </v-col>
+                    <v-col cols="6">
+                        <v-text-field
+                            v-model="semesterData.end_date"
+                            label="End Date"
+                            type="date"
+                            variant="outlined"
+                            density="compact"
+                        ></v-text-field>
+                    </v-col>
+                </v-row>
+                <v-switch
+                    v-model="semesterData.is_active"
+                    label="Current Semester"
+                    color="primary"
+                    density="compact"
+                ></v-switch>
+
+                <div class="mt-4">
+                    <div class="d-flex justify-space-between align-center mb-2">
+                        <div class="text-subtitle-2">Academic Events</div>
+                        <v-btn size="x-small" color="primary" variant="text" prepend-icon="mdi-plus" @click="openEventDialog()">Add Event</v-btn>
+                    </div>
+                    <v-divider class="mb-2"></v-divider>
+                    <v-list density="compact" class="pa-0">
+                        <v-list-item v-for="(event, index) in semesterData.calendar_events" :key="index" border class="mb-1 rounded">
+                            <v-list-item-title class="text-body-2">{{ event.name }}</v-list-item-title>
+                            <v-list-item-subtitle class="text-caption">{{ event.start_date }} to {{ event.end_date }}</v-list-item-subtitle>
+                            <template v-slot:append>
+                                <v-btn icon="mdi-pencil" size="x-small" variant="text" @click="openEventDialog(event, index)"></v-btn>
+                                <v-btn icon="mdi-delete" size="x-small" variant="text" color="error" @click="deleteEvent(event, index)"></v-btn>
+                            </template>
+                        </v-list-item>
+                        <div v-if="!semesterData.calendar_events?.length" class="text-center py-2 text-caption text-medium-emphasis border rounded border-dashed">
+                            No academic events added yet
+                        </div>
+                    </v-list>
+                </div>
             </v-card-text>
             <v-card-actions>
                 <v-spacer></v-spacer>
                 <v-btn variant="text" @click="semesterDialog = false">Cancel</v-btn>
                 <v-btn color="primary" @click="saveSemester" :loading="savingSemester">Save</v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
+
+    <!-- Offering Dialog -->
+    <v-dialog v-model="offeringDialog" max-width="500">
+        <v-card>
+            <v-card-title>{{ editingOffering ? 'Edit Offering' : 'Add Course Offering' }}</v-card-title>
+            <v-card-text>
+                <v-select
+                    v-model="offeringData.semester_id"
+                    :items="semesters"
+                    item-title="name"
+                    item-value="id"
+                    label="Semester"
+                    variant="outlined"
+                    disabled
+                ></v-select>
+                <v-select
+                    v-model="offeringData.course_code"
+                    :items="courses"
+                    item-title="code"
+                    item-value="code"
+                    label="Course"
+                    variant="outlined"
+                    :disabled="editingOffering"
+                >
+                    <template v-slot:item="{ props, item }">
+                        <v-list-item v-bind="props" :subtitle="item.raw.name"></v-list-item>
+                    </template>
+                </v-select>
+
+                <div class="mt-4">
+                    <div class="d-flex justify-space-between align-center mb-2">
+                        <div class="text-subtitle-2">Examinations</div>
+                        <v-btn size="x-small" color="primary" variant="text" prepend-icon="mdi-plus" @click="openExamDialog()">Add Exam</v-btn>
+                    </div>
+                    <v-divider class="mb-2"></v-divider>
+                    <v-list density="compact" class="pa-0">
+                        <v-list-item v-for="(exam, index) in offeringData.examinations" :key="index" border class="mb-1 rounded">
+                            <v-list-item-title class="text-body-2">{{ exam.name }}</v-list-item-title>
+                            <v-list-item-subtitle class="text-caption">{{ exam.max_marks }} Marks</v-list-item-subtitle>
+                            <template v-slot:append>
+                                <v-btn icon="mdi-pencil" size="x-small" variant="text" @click="openExamDialog(exam, index)"></v-btn>
+                                <v-btn icon="mdi-delete" size="x-small" variant="text" color="error" @click="deleteExam(exam, index)"></v-btn>
+                            </template>
+                        </v-list-item>
+                        <div v-if="!offeringData.examinations?.length" class="text-center py-2 text-caption text-medium-emphasis border rounded border-dashed">
+                            No examinations added yet
+                        </div>
+                    </v-list>
+                </div>
+
+                <div class="mt-4">
+                    <div class="d-flex justify-space-between align-center mb-2">
+                        <div class="text-subtitle-2">Teachers</div>
+                    </div>
+                    <v-divider class="mb-2"></v-divider>
+                    <v-row class="mb-2" dense>
+                        <v-col cols="10">
+                            <v-select
+                                v-model="selectedTeacherId"
+                                :items="allTeachers"
+                                item-title="name"
+                                item-value="id"
+                                label="Assign Teacher"
+                                variant="outlined"
+                                density="compact"
+                                hide-details
+                            ></v-select>
+                        </v-col>
+                        <v-col cols="2">
+                            <v-btn 
+                                block 
+                                color="primary" 
+                                height="40" 
+                                @click="addTeacherToOffering" 
+                                :loading="addingTeacher"
+                                :disabled="!selectedTeacherId"
+                            >Add</v-btn>
+                        </v-col>
+                    </v-row>
+                    <v-list density="compact" class="pa-0">
+                        <v-list-item v-for="(teacher, index) in offeringData.teachers" :key="index" border class="mb-1 rounded">
+                            <v-list-item-title class="text-body-2">{{ teacher.teacher_name }}</v-list-item-title>
+                            <v-list-item-subtitle class="text-caption">{{ teacher.teacher_id }}</v-list-item-subtitle>
+                            <template v-slot:append>
+                                <v-btn icon="mdi-delete" size="x-small" variant="text" color="error" @click="removeTeacherFromOffering(teacher, index)"></v-btn>
+                            </template>
+                        </v-list-item>
+                        <div v-if="!offeringData.teachers?.length" class="text-center py-2 text-caption text-medium-emphasis border rounded border-dashed">
+                            No teachers assigned yet
+                        </div>
+                    </v-list>
+                </div>
+            </v-card-text>
+            <v-card-actions>
+                <v-spacer></v-spacer>
+                <v-btn variant="text" @click="offeringDialog = false">Cancel</v-btn>
+                <v-btn color="primary" @click="saveOffering" :loading="savingOffering">Save</v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
+
+    <!-- Exam Dialog -->
+    <v-dialog v-model="examDialog" max-width="400">
+        <v-card>
+            <v-card-title>{{ editingExam ? 'Edit Examination' : 'Add Examination' }}</v-card-title>
+            <v-card-text>
+                <v-text-field
+                    v-model="examData.name"
+                    label="Exam Name"
+                    variant="outlined"
+                    density="compact"
+                    placeholder="e.g. Mid Term, End Sem"
+                ></v-text-field>
+                <v-text-field
+                    v-model.number="examData.max_marks"
+                    label="Max Marks"
+                    type="number"
+                    variant="outlined"
+                    density="compact"
+                ></v-text-field>
+                <v-text-field
+                    v-model="examData.date"
+                    label="Exam Date (Optional)"
+                    type="date"
+                    variant="outlined"
+                    density="compact"
+                ></v-text-field>
+            </v-card-text>
+            <v-card-actions>
+                <v-spacer></v-spacer>
+                <v-btn variant="text" @click="examDialog = false">Cancel</v-btn>
+                <v-btn color="primary" @click="saveExam" :loading="savingExam">Save Exam</v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
+
+    <!-- Event Dialog -->
+    <v-dialog v-model="eventDialog" max-width="400">
+        <v-card>
+            <v-card-title>{{ editingEvent ? 'Edit Event' : 'Add Academic Event' }}</v-card-title>
+            <v-card-text>
+                <v-text-field
+                    v-model="eventData.name"
+                    label="Event Name"
+                    variant="outlined"
+                    density="compact"
+                    placeholder="e.g. Registration, Mid-Sem Break"
+                ></v-text-field>
+                <v-text-field
+                    v-model="eventData.start_date"
+                    label="Start Date"
+                    type="date"
+                    variant="outlined"
+                    density="compact"
+                ></v-text-field>
+                <v-text-field
+                    v-model="eventData.end_date"
+                    label="End Date"
+                    type="date"
+                    variant="outlined"
+                    density="compact"
+                ></v-text-field>
+            </v-card-text>
+            <v-card-actions>
+                <v-spacer></v-spacer>
+                <v-btn variant="text" @click="eventDialog = false">Cancel</v-btn>
+                <v-btn color="primary" @click="saveEvent" :loading="savingEvent">Save Event</v-btn>
             </v-card-actions>
         </v-card>
     </v-dialog>
@@ -327,7 +664,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
 import { useAuthStore } from '../stores/auth'
 
@@ -338,16 +675,25 @@ const tab = ref('users')
 const semesters = ref([])
 const loadingSemesters = ref(false)
 const semesterDialog = ref(false)
-const semesterData = ref({ id: null, start_date: '', end_date: '' })
+const semesterData = ref({ id: null, name: '', start_date: '', end_date: '', is_active: false, calendar_events: [] })
 const editingSemester = ref(false)
 const savingSemester = ref(false)
 
 const semesterHeaders = [
     { title: 'Semester ID', key: 'id' },
+    { title: 'Name', key: 'name' },
     { title: 'Start Date', key: 'start_date' },
     { title: 'End Date', key: 'end_date' },
+    { title: 'Events', key: 'calendar_events', sortable: false },
     { title: 'Actions', key: 'actions', sortable: false }
 ]
+
+// Academic Events Management (Nested)
+const eventDialog = ref(false)
+const eventData = ref({ name: '', start_date: '', end_date: '' })
+const editingEvent = ref(false)
+const savingEvent = ref(false)
+const currentEventIndex = ref(-1)
 
 const fetchSemesters = async () => {
     loadingSemesters.value = true
@@ -362,10 +708,10 @@ const fetchSemesters = async () => {
 
 const openSemesterDialog = (item = null) => {
     if (item) {
-        semesterData.value = { ...item }
+        semesterData.value = JSON.parse(JSON.stringify(item))
         editingSemester.value = true
     } else {
-        semesterData.value = { id: null, start_date: '', end_date: '' }
+        semesterData.value = { id: null, name: '', start_date: '', end_date: '', is_active: false, calendar_events: [] }
         editingSemester.value = false
     }
     semesterDialog.value = true
@@ -379,9 +725,16 @@ const saveSemester = async () => {
                 headers: { Authorization: `Bearer ${auth.token}` }
             })
         } else {
-            await axios.post('http://localhost:8000/api/v1/academic/semesters/', semesterData.value, {
+            const res = await axios.post('http://localhost:8000/api/v1/academic/semesters/', semesterData.value, {
                 headers: { Authorization: `Bearer ${auth.token}` }
             })
+            const semesterId = res.data.id
+            // If new semester, create pending events
+            for (const event of semesterData.value.calendar_events) {
+                await axios.post('http://localhost:8000/api/v1/academic/events/', { ...event, semester_id: semesterId }, {
+                    headers: { Authorization: `Bearer ${auth.token}` }
+                })
+            }
         }
         snackbar.value = { show: true, text: 'Semester saved successfully', color: 'success' }
         semesterDialog.value = false
@@ -390,6 +743,76 @@ const saveSemester = async () => {
         snackbar.value = { show: true, text: 'Failed to save semester: ' + (e.response?.data?.detail || e.message), color: 'error' }
     } finally {
         savingSemester.value = false
+    }
+}
+
+const openEventDialog = (item = null, index = -1) => {
+    if (item) {
+        eventData.value = { ...item }
+        editingEvent.value = true
+        currentEventIndex.value = index
+    } else {
+        eventData.value = { name: '', start_date: '', end_date: '' }
+        editingEvent.value = false
+        currentEventIndex.value = -1
+    }
+    eventDialog.value = true
+}
+
+const saveEvent = async () => {
+    if (editingSemester.value && eventData.value.id) {
+        savingEvent.value = true
+        try {
+            await axios.put(`http://localhost:8000/api/v1/academic/events/${eventData.value.id}`, eventData.value, {
+                headers: { Authorization: `Bearer ${auth.token}` }
+            })
+            const idx = semesterData.value.calendar_events.findIndex(e => e.id === eventData.value.id)
+            if (idx !== -1) semesterData.value.calendar_events[idx] = { ...eventData.value }
+            eventDialog.value = false
+        } catch (e) {
+            snackbar.value = { show: true, text: 'Failed to save event: ' + (e.response?.data?.detail || e.message), color: 'error' }
+        } finally {
+            savingEvent.value = false
+        }
+    } else if (editingSemester.value && !eventData.value.id) {
+        savingEvent.value = true
+        try {
+            const res = await axios.post('http://localhost:8000/api/v1/academic/events/', {
+                ...eventData.value,
+                semester_id: semesterData.value.id
+            }, {
+                headers: { Authorization: `Bearer ${auth.token}` }
+            })
+            semesterData.value.calendar_events.push(res.data)
+            eventDialog.value = false
+        } catch (e) {
+            snackbar.value = { show: true, text: 'Failed to create event: ' + (e.response?.data?.detail || e.message), color: 'error' }
+        } finally {
+            savingEvent.value = false
+        }
+    } else {
+        if (currentEventIndex.value !== -1) {
+            semesterData.value.calendar_events[currentEventIndex.value] = { ...eventData.value }
+        } else {
+            semesterData.value.calendar_events.push({ ...eventData.value })
+        }
+        eventDialog.value = false
+    }
+}
+
+const deleteEvent = async (item, index) => {
+    if (!confirm(`Are you sure you want to delete event ${item.name}?`)) return
+    if (editingSemester.value && item.id) {
+        try {
+            await axios.delete(`http://localhost:8000/api/v1/academic/events/${item.id}`, {
+                headers: { Authorization: `Bearer ${auth.token}` }
+            })
+            semesterData.value.calendar_events.splice(index, 1)
+        } catch (e) {
+            snackbar.value = { show: true, text: 'Failed to delete event: ' + (e.response?.data?.detail || e.message), color: 'error' }
+        }
+    } else {
+        semesterData.value.calendar_events.splice(index, 1)
     }
 }
 
@@ -493,7 +916,7 @@ const userHeaders = [
     { title: 'ID', key: 'id' },
     { title: 'Name', key: 'name' },
     { title: 'Email', key: 'email' },
-    { title: 'Role', key: 'current_role' }, // Assuming backend returns current_role or we need to process roles
+    { title: 'Roles', key: 'roles', sortable: false },
     { title: 'Status', key: 'is_active' },
     { title: 'Actions', key: 'actions', sortable: false }
 ]
@@ -511,10 +934,13 @@ const fetchUsers = async () => {
 
 const openUserDialog = (item = null) => {
     if (item) {
-        userData.value = { ...item }
+        userData.value = { 
+            ...item,
+            roles: item.roles ? item.roles.map(r => r.role) : []
+        }
         editingUser.value = true
     } else {
-        userData.value = { id: '', name: '', email: '', password: 'password123', role: 'student', discipline_code: null, is_active: true }
+        userData.value = { id: '', name: '', email: '', password: '', roles: ['student'], discipline_code: null, is_active: true }
         editingUser.value = false
     }
     userDialog.value = true
@@ -525,10 +951,6 @@ const saveUser = async () => {
     try {
         // Prepare data
         const data = { ...userData.value }
-        // Handle roles if creating new user, backend expects roles list
-        if (!editingUser.value) {
-             data.roles = [data.role]
-        }
         
         if (editingUser.value) {
             await axios.put(`http://localhost:8000/api/v1/users/${userData.value.id}`, data, {
@@ -562,6 +984,7 @@ const deactivateUser = async (item) => {
     }
 }
 
+const searchUsers = ref('')
 const userFile = ref(null)
 const uploadingUsers = ref(false)
 
@@ -639,8 +1062,241 @@ const deleteCourse = async (item) => {
     }
 }
 
-const offeringFile = ref(null)
-const uploadingOfferings = ref(false)
+const searchCourses = ref('')
+
+// Offerings Management
+const offerings = ref([])
+const loadingOfferings = ref(false)
+const selectedOfferingSemester = ref(null)
+const searchOfferings = ref('')
+const offeringDialog = ref(false)
+const offeringData = ref({ course_code: '', semester_id: null })
+const editingOffering = ref(false)
+const savingOffering = ref(false)
+
+const offeringHeaders = [
+    { title: 'Course Code', key: 'course_code' },
+    { title: 'Course Name', key: 'course.name' },
+    { title: 'Category', key: 'course.category' },
+    { title: 'Examinations', key: 'examinations', sortable: false },
+    { title: 'Teachers', key: 'teachers', sortable: false },
+    { title: 'Actions', key: 'actions', sortable: false }
+]
+
+// Examinations Management (Nested)
+const examDialog = ref(false)
+const examData = ref({ name: '', max_marks: 100, date: null })
+const editingExam = ref(false)
+const savingExam = ref(false)
+const currentExamIndex = ref(-1)
+
+// Teachers Management (Nested)
+const addingTeacher = ref(false)
+const selectedTeacherId = ref(null)
+
+const allTeachers = computed(() => {
+    return users.value.filter(u => u.roles.some(r => r.role === 'teacher'))
+})
+
+const fetchOfferings = async () => {
+    if (!selectedOfferingSemester.value) {
+        offerings.value = []
+        return
+    }
+    loadingOfferings.value = true
+    try {
+        const res = await axios.get(`http://localhost:8000/api/v1/courses/semester-courses?semester_id=${selectedOfferingSemester.value}`, {
+             headers: { Authorization: `Bearer ${auth.token}` }
+        })
+        offerings.value = res.data
+    } catch(e) { console.error(e) }
+    finally { loadingOfferings.value = false }
+}
+
+const openOfferingDialog = (item = null) => {
+    if (item) {
+        offeringData.value = JSON.parse(JSON.stringify(item))
+        editingOffering.value = true
+    } else {
+        offeringData.value = { course_code: '', semester_id: selectedOfferingSemester.value, examinations: [], teachers: [] }
+        editingOffering.value = false
+    }
+    offeringDialog.value = true
+}
+
+const saveOffering = async () => {
+    savingOffering.value = true
+    try {
+        let offeringId = offeringData.value.id
+        if (editingOffering.value) {
+            await axios.put(`http://localhost:8000/api/v1/courses/offerings/${offeringData.value.id}`, offeringData.value, {
+                headers: { Authorization: `Bearer ${auth.token}` }
+            })
+        } else {
+            const res = await axios.post('http://localhost:8000/api/v1/courses/offerings/', offeringData.value, {
+                headers: { Authorization: `Bearer ${auth.token}` }
+            })
+            offeringId = res.data.id
+            
+            // Create pending exams for new offering
+            for (const exam of offeringData.value.examinations) {
+                await axios.post('http://localhost:8000/api/v1/examinations/', { ...exam, course_offering_id: offeringId }, {
+                    headers: { Authorization: `Bearer ${auth.token}` }
+                })
+            }
+            
+            // Create pending teacher assignments for new offering
+            for (const teacher of offeringData.value.teachers) {
+                await axios.post(`http://localhost:8000/api/v1/courses/offerings/${offeringId}/teachers?teacher_id=${teacher.teacher_id}`, {}, {
+                    headers: { Authorization: `Bearer ${auth.token}` }
+                })
+            }
+        }
+        snackbar.value = { show: true, text: 'Offering saved successfully', color: 'success' }
+        offeringDialog.value = false
+        fetchOfferings()
+    } catch (e) {
+        snackbar.value = { show: true, text: 'Failed to save offering: ' + (e.response?.data?.detail || e.message), color: 'error' }
+    } finally {
+        savingOffering.value = false
+    }
+}
+
+const openExamDialog = (item = null, index = -1) => {
+    if (item) {
+        examData.value = { ...item }
+        editingExam.value = true
+        currentExamIndex.value = index
+    } else {
+        examData.value = { name: '', max_marks: 100, date: null }
+        editingExam.value = false
+        currentExamIndex.value = -1
+    }
+    examDialog.value = true
+}
+
+const saveExam = async () => {
+    if (editingOffering.value && examData.value.id) {
+        // Update existing exam in DB
+        savingExam.value = true
+        try {
+            await axios.put(`http://localhost:8000/api/v1/examinations/${examData.value.id}`, examData.value, {
+                headers: { Authorization: `Bearer ${auth.token}` }
+            })
+            // Update local state
+            const idx = offeringData.value.examinations.findIndex(e => e.id === examData.value.id)
+            if (idx !== -1) offeringData.value.examinations[idx] = { ...examData.value }
+            examDialog.value = false
+        } catch (e) {
+             snackbar.value = { show: true, text: 'Failed to save exam: ' + (e.response?.data?.detail || e.message), color: 'error' }
+        } finally {
+            savingExam.value = false
+        }
+    } else if (editingOffering.value && !examData.value.id) {
+        // Create new exam for existing offering
+        savingExam.value = true
+        try {
+            const res = await axios.post('http://localhost:8000/api/v1/examinations/', { 
+                ...examData.value, 
+                course_offering_id: offeringData.value.id 
+            }, {
+                headers: { Authorization: `Bearer ${auth.token}` }
+            })
+            offeringData.value.examinations.push(res.data)
+            examDialog.value = false
+        } catch (e) {
+             snackbar.value = { show: true, text: 'Failed to create exam: ' + (e.response?.data?.detail || e.message), color: 'error' }
+        } finally {
+            savingExam.value = false
+        }
+    } else {
+        // Create/Update in local list for new offering
+        if (currentExamIndex.value !== -1) {
+            offeringData.value.examinations[currentExamIndex.value] = { ...examData.value }
+        } else {
+            offeringData.value.examinations.push({ ...examData.value })
+        }
+        examDialog.value = false
+    }
+}
+
+const deleteExam = async (item, index) => {
+    if (!confirm(`Are you sure you want to delete exam ${item.name}?`)) return
+    
+    if (editingOffering.value && item.id) {
+        try {
+            await axios.delete(`http://localhost:8000/api/v1/examinations/${item.id}`, {
+                headers: { Authorization: `Bearer ${auth.token}` }
+            })
+            offeringData.value.examinations.splice(index, 1)
+        } catch (e) {
+            snackbar.value = { show: true, text: 'Failed to delete exam: ' + (e.response?.data?.detail || e.message), color: 'error' }
+        }
+    } else {
+        offeringData.value.examinations.splice(index, 1)
+    }
+}
+
+const addTeacherToOffering = async () => {
+    if (!selectedTeacherId.value) return
+    
+    const teacher = allTeachers.value.find(u => u.id === selectedTeacherId.value)
+    if (!teacher) return
+
+    if (editingOffering.value) {
+        addingTeacher.value = true
+        try {
+            const res = await axios.post(`http://localhost:8000/api/v1/courses/offerings/${offeringData.value.id}/teachers?teacher_id=${selectedTeacherId.value}`, {}, {
+                headers: { Authorization: `Bearer ${auth.token}` }
+            })
+            offeringData.value.teachers.push(res.data)
+            selectedTeacherId.value = null
+        } catch (e) {
+            snackbar.value = { show: true, text: 'Failed to add teacher: ' + (e.response?.data?.detail || e.message), color: 'error' }
+        } finally {
+            addingTeacher.value = false
+        }
+    } else {
+        // Just add to local list for new offering
+        if (!offeringData.value.teachers.some(t => t.teacher_id === teacher.id)) {
+            offeringData.value.teachers.push({
+                teacher_id: teacher.id,
+                teacher_name: teacher.name
+            })
+        }
+        selectedTeacherId.value = null
+    }
+}
+
+const removeTeacherFromOffering = async (teacher, index) => {
+    if (!confirm(`Are you sure you want to remove ${teacher.teacher_name}?`)) return
+    
+    if (editingOffering.value && teacher.id) {
+        try {
+            await axios.delete(`http://localhost:8000/api/v1/courses/offerings/${offeringData.value.id}/teachers/${teacher.teacher_id}`, {
+                headers: { Authorization: `Bearer ${auth.token}` }
+            })
+            offeringData.value.teachers.splice(index, 1)
+        } catch (e) {
+            snackbar.value = { show: true, text: 'Failed to remove teacher: ' + (e.response?.data?.detail || e.message), color: 'error' }
+        }
+    } else {
+        offeringData.value.teachers.splice(index, 1)
+    }
+}
+
+const deleteOffering = async (item) => {
+    if (!confirm(`Are you sure you want to delete offering for ${item.course_code}?`)) return
+    try {
+        await axios.delete(`http://localhost:8000/api/v1/courses/offerings/${item.id}`, {
+            headers: { Authorization: `Bearer ${auth.token}` }
+        })
+        snackbar.value = { show: true, text: 'Offering deleted', color: 'success' }
+        fetchOfferings()
+    } catch (e) {
+        snackbar.value = { show: true, text: 'Failed to delete: ' + (e.response?.data?.detail || e.message), color: 'error' }
+    }
+}
 
 const snackbar = ref({ show: false, text: '', color: 'success' })
 

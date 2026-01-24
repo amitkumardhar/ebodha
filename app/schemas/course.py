@@ -34,9 +34,18 @@ class CourseOfferingBase(BaseModel):
 class CourseOfferingCreate(CourseOfferingBase):
     pass
 
+class CourseOfferingUpdate(BaseModel):
+    course_code: Optional[str] = None
+    semester_id: Optional[int] = None
+
+from app.schemas.examination import Examination as ExaminationSchema
+from app.schemas.teacher import TeacherInfo
+
 class CourseOffering(CourseOfferingBase):
     id: int
     course: Optional[Course] = None
+    examinations: List[ExaminationSchema] = []
+    teachers: List[TeacherInfo] = []
     class Config:
         orm_mode = True
 

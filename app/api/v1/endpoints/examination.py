@@ -29,6 +29,54 @@ def create_examination(
     db.refresh(exam)
     return exam
 
+from app.schemas.examination import ExaminationUpdate
+
+@router.put("/{exam_id}", response_model=ExaminationSchema)
+def update_examination(
+    *,
+    db: Session = Depends(deps.get_db),
+    exam_id: int,
+    exam_in: ExaminationUpdate,
+    current_user: User = Depends(deps.get_current_active_teacher), # Teachers/Admins
+) -> Any:
+    """
+    Update an examination.
+    """
+    exam = db.query(Examination).filter(Examination.id == exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Examination not found")
+    
+    update_data = exam_in.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(exam, field, value)
+        
+    db.add(exam)
+    db.commit()
+    db.refresh(exam)
+    return exam
+
+@router.delete("/{exam_id}")
+def delete_examination(
+    *,
+    db: Session = Depends(deps.get_db),
+    exam_id: int,
+    current_user: User = Depends(deps.get_current_active_teacher),
+) -> Any:
+    """
+    Delete an examination.
+    """
+    exam = db.query(Examination).filter(Examination.id == exam_id).first()
+    if not exam:
+        raise HTTPException(status_code=404, detail="Examination not found")
+    
+    # Check for marks
+    if exam.marks:
+        raise HTTPException(status_code=400, detail="Cannot delete examination with existing marks")
+        
+    db.delete(exam)
+    db.commit()
+    return {"message": "Examination deleted successfully"}
+
 @router.post("/bulk-upload-marks")
 async def bulk_upload_marks(
     course_code: str,
