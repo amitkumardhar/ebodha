@@ -226,6 +226,33 @@
         </v-card>
     </v-dialog>
 
+    <!-- Bulk Upload Result Dialog -->
+    <v-dialog v-model="resultDialog" max-width="600">
+        <v-card>
+            <v-card-title :class="['text-h6', resultStats.errors?.length ? 'text-warning' : 'text-success']">
+                {{ resultStats.errors?.length ? 'Upload Completed with Errors' : 'Upload Successful' }}
+            </v-card-title>
+            <v-card-text>
+                <div class="text-subtitle-1 mb-2">
+                    Successfully Created: {{ resultStats.created }}
+                </div>
+                
+                <div v-if="resultStats.errors?.length">
+                    <div class="text-subtitle-2 text-error mb-1">Errors ({{ resultStats.errors.length }}):</div>
+                    <v-sheet border class="pa-2 overflow-y-auto" max-height="300" color="grey-lighten-4">
+                        <div v-for="(error, i) in resultStats.errors" :key="i" class="text-caption text-error mb-1">
+                            {{ error }}
+                        </div>
+                    </v-sheet>
+                </div>
+            </v-card-text>
+            <v-card-actions>
+                <v-spacer></v-spacer>
+                <v-btn color="primary" @click="resultDialog = false">Close</v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
+
     <v-snackbar v-model="snackbar.show" :color="snackbar.color">
         {{ snackbar.text }}
     </v-snackbar>
@@ -251,6 +278,8 @@ const offeringData = ref({ course_code: '', semester_id: null, examinations: [],
 const editingOffering = ref(false)
 const savingOffering = ref(false)
 const snackbar = ref({ show: false, text: '', color: 'success' })
+const resultDialog = ref(false)
+const resultStats = ref({ created: 0, errors: [] })
 
 // Nested Exam State
 const examDialog = ref(false)
@@ -497,12 +526,15 @@ const uploadOfferings = async () => {
             }
         })
         const count = res.data.offerings_created
-        const errors = res.data.errors.length
-        snackbar.value = { show: true, text: `Created ${count} offerings. Errors: ${errors}`, color: errors > 0 ? 'warning' : 'success' }
+        const errors = res.data.errors
+        
+        resultStats.value = { created: count, errors: errors }
+        resultDialog.value = true
+
         offeringFile.value = null
         fetchOfferings()
     } catch (e) {
-        snackbar.value = { show: true, text: 'Upload failed: ' + e.message, color: 'error' }
+        snackbar.value = { show: true, text: 'Upload failed: ' + (e.response?.data?.detail || e.message), color: 'error' }
     } finally {
         uploadingOfferings.value = false
     }

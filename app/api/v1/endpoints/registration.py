@@ -147,7 +147,35 @@ def assign_grade(
     db.add(registration)
     db.commit()
     db.refresh(registration)
+    db.refresh(registration)
     return registration
+
+@router.delete("/{registration_id}")
+def delete_registration(
+    *,
+    db: Session = Depends(deps.get_db),
+    registration_id: int,
+    current_user: User = Depends(deps.get_current_active_admin),
+) -> Any:
+    """
+    Delete a registration and its associated marks.
+    """
+    registration = db.query(Registration).filter(Registration.id == registration_id).first()
+    if not registration:
+        raise HTTPException(status_code=404, detail="Registration not found")
+    
+    # Delete associated marks
+    # Note: We need to import Marks if not already imported or use relationship cascade
+    # Let's use the relationship if available, or manual query.
+    # checking imports: from app.models.examination import Registration, GradeMapping
+    # We need Marks. It is in app.models.examination.
+    from app.models.examination import Marks
+    
+    db.query(Marks).filter(Marks.registration_id == registration_id).delete()
+    
+    db.delete(registration)
+    db.commit()
+    return {"message": "Registration deleted successfully"}
 
 @router.post("/bulk-upload-grades")
 async def bulk_upload_grades(
