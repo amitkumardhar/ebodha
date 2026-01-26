@@ -40,6 +40,16 @@
                 ></v-select>
             </v-col>
             <v-col cols="12" md="4" class="text-right">
+                <v-btn
+                    v-if="selectedCourse"
+                    color="primary"
+                    variant="text"
+                    prepend-icon="mdi-download"
+                    class="mr-2"
+                    @click="downloadRegistrations"
+                >
+                    Download CSV
+                </v-btn>
                 <v-menu v-if="selectedCourse">
                     <template v-slot:activator="{ props }">
                         <v-btn color="primary" prepend-icon="mdi-upload" v-bind="props">
@@ -247,6 +257,7 @@
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { useAuthStore } from '../../stores/auth'
+import { downloadDataAsCSV } from '../../utils/csv'
 
 const auth = useAuthStore()
 
@@ -468,6 +479,15 @@ const deleteRegistration = async (item) => {
     } catch (e) {
         snackbar.value = { show: true, text: 'Deletion failed: ' + (e.response?.data?.detail || e.message), color: 'error' }
     }
+}
+
+const downloadRegistrations = () => {
+    // Custom headers to handle complex marks? Or just flatten automatically?
+    // downloadDataAsCSV handles flattened stringification.
+    // However, 'marks' is an array of objects.
+    // The utility will join them. For specific format, we might want to preprocess data.
+    // But basic dump is acceptable per requirement.
+    downloadDataAsCSV(courseDetails.value, studentHeaders, 'Registration_Details', auth.user?.name || 'User')
 }
 
 onMounted(() => {

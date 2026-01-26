@@ -2,7 +2,10 @@
     <v-card border flat class="pa-4">
         <div class="d-flex justify-space-between align-center mb-4">
             <div class="text-h6">Disciplines</div>
-            <v-btn color="primary" prepend-icon="mdi-plus" @click="openDisciplineDialog()">Add Discipline</v-btn>
+            <div>
+                <v-btn color="primary" variant="text" prepend-icon="mdi-download" class="mr-2" @click="downloadDisciplines">Download CSV</v-btn>
+                <v-btn color="primary" prepend-icon="mdi-plus" @click="openDisciplineDialog()">Add Discipline</v-btn>
+            </div>
         </div>
 
         <v-data-table
@@ -62,6 +65,7 @@
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { useAuthStore } from '../../stores/auth'
+import { downloadDataAsCSV } from '../../utils/csv'
 
 const auth = useAuthStore()
 
@@ -126,6 +130,10 @@ const saveDiscipline = async () => {
     } finally {
         savingDiscipline.value = false
     }
+}
+
+const downloadDisciplines = () => {
+    downloadDataAsCSV(disciplines.value, disciplineHeaders, 'Disciplines', auth.user?.name || 'User')
 }
 
 const confirmDeleteDiscipline = async (item) => {

@@ -10,6 +10,9 @@
                 </span>
             </div>
         </div>
+        <v-btn color="primary" prepend-icon="mdi-download" @click="downloadReport" :disabled="!report.length">
+            Download Record
+        </v-btn>
     </div>
     
     <v-progress-linear v-if="loading" indeterminate color="primary"></v-progress-linear>
@@ -84,6 +87,7 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import axios from 'axios'
 import { useAuthStore } from '../stores/auth'
+import { downloadDataAsCSV } from '../utils/csv'
 
 const auth = useAuthStore()
 const loading = ref(true)
@@ -166,4 +170,53 @@ onMounted(() => {
 watch(() => auth.user, () => {
     fetchDiscipline()
 })
+
+const downloadReport = () => {
+    // Flatten the report for CSV
+    const flatData = []
+    report.value.forEach(item => {
+        // If no marks, add one row for course
+        if (!item.marks || item.marks.length === 0) {
+            flatData.push({
+                semester: getSemesterName(item.course.semester_id),
+                course_code: item.course.code,
+                course_name: item.course.name,
+                credits: item.course.credits,
+                grade: item.grade || 'N/A',
+                grade_point: item.grade_point || '',
+                exam_name: '',
+                marks_obtained: '',
+                max_marks: ''
+            })
+        } else {
+            item.marks.forEach(mark => {
+                flatData.push({
+                    semester: getSemesterName(item.course.semester_id),
+                    course_code: item.course.code,
+                    course_name: item.course.name,
+                    credits: item.course.credits,
+                    grade: item.grade || 'N/A',
+                    grade_point: item.grade_point || '',
+                    exam_name: mark.exam_name,
+                    marks_obtained: mark.marks_obtained,
+                    max_marks: mark.max_marks
+                })
+            })
+        }
+    })
+    
+    const headers = [
+        { title: 'Semester', key: 'semester' },
+        { title: 'Course Code', key: 'course_code' },
+        { title: 'Course Name', key: 'course_name' },
+        { title: 'Credits', key: 'credits' },
+        { title: 'Grade', key: 'grade' },
+        { title: 'Grade Point', key: 'grade_point' },
+        { title: 'Exam', key: 'exam_name' },
+        { title: 'Obtained', key: 'marks_obtained' },
+        { title: 'Max Marks', key: 'max_marks' }
+    ]
+    
+    downloadDataAsCSV(flatData, headers, 'Academic_Record', auth.user?.name || 'Student')
+}
 </script>

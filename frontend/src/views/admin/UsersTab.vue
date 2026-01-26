@@ -2,7 +2,10 @@
     <v-card border flat class="pa-4">
         <div class="d-flex justify-space-between align-center mb-4">
             <div class="text-h6">Users</div>
-            <v-btn color="primary" prepend-icon="mdi-plus" @click="openUserDialog()">Add User</v-btn>
+            <div>
+                <v-btn color="primary" variant="text" prepend-icon="mdi-download" class="mr-2" @click="downloadUsers">Download CSV</v-btn>
+                <v-btn color="primary" prepend-icon="mdi-plus" @click="openUserDialog()">Add User</v-btn>
+            </div>
         </div>
 
         <v-text-field
@@ -151,6 +154,7 @@
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { useAuthStore } from '../../stores/auth'
+import { downloadDataAsCSV } from '../../utils/csv'
 
 const auth = useAuthStore()
 
@@ -266,6 +270,10 @@ const uploadUsers = async () => {
     } finally {
         uploadingUsers.value = false
     }
+}
+
+const downloadUsers = () => {
+    downloadDataAsCSV(users.value, userHeaders, 'Users', auth.user?.name || 'User')
 }
 
 onMounted(() => {

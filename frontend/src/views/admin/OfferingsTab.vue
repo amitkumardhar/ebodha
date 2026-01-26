@@ -19,6 +19,16 @@
             <v-col cols="12" md="6" class="text-right">
                 <v-btn
                     color="primary"
+                    prepend-icon="mdi-download"
+                    variant="text"
+                    class="mr-2"
+                    @click="downloadOfferings"
+                    :disabled="!selectedOfferingSemester"
+                >
+                    Download CSV
+                </v-btn>
+                <v-btn
+                    color="primary"
                     prepend-icon="mdi-plus"
                     @click="openOfferingDialog()"
                     :disabled="!selectedOfferingSemester"
@@ -262,6 +272,7 @@
 import { ref, onMounted, computed } from 'vue'
 import axios from 'axios'
 import { useAuthStore } from '../../stores/auth'
+import { downloadDataAsCSV } from '../../utils/csv'
 
 const auth = useAuthStore()
 
@@ -538,6 +549,10 @@ const uploadOfferings = async () => {
     } finally {
         uploadingOfferings.value = false
     }
+}
+
+const downloadOfferings = () => {
+    downloadDataAsCSV(offerings.value, offeringHeaders, 'Course_Offerings', auth.user?.name || 'User')
 }
 
 onMounted(() => {

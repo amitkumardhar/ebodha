@@ -5,6 +5,12 @@
                 {{ course.course?.name || course.course_code }} Details
             </v-toolbar-title>
             <v-spacer></v-spacer>
+            <v-btn
+                variant="text"
+                prepend-icon="mdi-download"
+                @click="downloadDetails"
+                class="mr-2"
+            >Download CSV</v-btn>
             <v-menu>
                 <template v-slot:activator="{ props }">
                     <v-btn icon="mdi-dots-vertical" v-bind="props"></v-btn>
@@ -96,6 +102,7 @@
 import { ref, watch } from 'vue'
 import axios from 'axios'
 import { useAuthStore } from '../../stores/auth'
+import { downloadDataAsCSV } from '../../utils/csv'
 
 const props = defineProps({
     course: Object,
@@ -197,5 +204,9 @@ const saveMark = async () => {
     } finally {
         savingMark.value = false
     }
+}
+
+const downloadDetails = () => {
+    downloadDataAsCSV(courseDetails.value, studentHeaders, 'Course_Details', auth.user?.name || 'User')
 }
 </script>
