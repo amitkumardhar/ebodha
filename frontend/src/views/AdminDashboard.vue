@@ -14,6 +14,7 @@
         <v-tab value="courses">Courses</v-tab>
         <v-tab value="offerings">Course Offerings</v-tab>
         <v-tab value="registrations">Registration</v-tab>
+        <v-tab value="compartment">Compartment</v-tab>
     </v-tabs>
 
     <v-window v-model="tab" class="mt-4">
@@ -40,6 +41,10 @@
         <v-window-item value="registrations">
             <RegistrationTab />
         </v-window-item>
+
+        <v-window-item value="compartment">
+            <CompartmentTab />
+        </v-window-item>
     </v-window>
   </v-container>
 </template>
@@ -53,6 +58,7 @@ import SemestersTab from './admin/SemestersTab.vue'
 import CoursesTab from './admin/CoursesTab.vue'
 import OfferingsTab from './admin/OfferingsTab.vue'
 import RegistrationTab from './admin/RegistrationTab.vue'
+import CompartmentTab from './admin/CompartmentTab.vue'
 
 const auth = useAuthStore()
 const tab = ref('users')

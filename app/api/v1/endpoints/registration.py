@@ -73,17 +73,46 @@ async def bulk_upload_registrations(
     decoded_content = content.decode('utf-8')
     csv_reader = csv.DictReader(io.StringIO(decoded_content))
     
+    # Validate headers
+    # We expect 'student_id', 'course_code', and 'semester'
+    fieldnames = csv_reader.fieldnames
+    if not fieldnames:
+        raise HTTPException(status_code=400, detail="CSV file is empty or has no headers")
+        
+    required_fields = {'student_id', 'course_code'}
+    if not required_fields.issubset(set(fieldnames)):
+         missing = required_fields - set(fieldnames)
+         raise HTTPException(status_code=400, detail=f"Missing required columns: {', '.join(missing)}")
+    
+    if 'semester' not in fieldnames:
+         raise HTTPException(status_code=400, detail="Missing required column: semester")
+    
     registrations_created = 0
     errors = []
     
+    from app.models.academic import Semester
+    
     for row_idx, row in enumerate(csv_reader):
         try:
-            student_id = row.get('student_id')
-            course_code = row.get('course_code')
-            semester_id = int(row.get('semester_id'))
+            student_id = row.get('student_id', '').strip() if row.get('student_id', '') else None
+            course_code = row.get('course_code', '').strip() if row.get('course_code', '') else None
             
-            if not student_id or not course_code or not semester_id:
+            semester_id = None
+            semester_name = row.get('semester', '').strip() if row.get('semester', '') else None
+            
+            if not student_id or not course_code:
                 errors.append(f"Row {row_idx}: Missing required fields")
+                continue
+                
+            # Resolve Semester ID
+            if semester_name:
+                semester = db.query(Semester).filter(Semester.name == semester_name).first()
+                if not semester:
+                    errors.append(f"Row {row_idx}: Semester '{semester_name}' not found")
+                    continue
+                semester_id = semester.id
+            else:
+                errors.append(f"Row {row_idx}: Missing semester info")
                 continue
             
             # Find offering
@@ -146,7 +175,6 @@ def assign_grade(
 
     db.add(registration)
     db.commit()
-    db.refresh(registration)
     db.refresh(registration)
     return registration
 
@@ -307,8 +335,70 @@ def get_my_report(
         
     return report
 
-from app.schemas.examination import CompartmentRegistrationCreate, CompartmentRegistration as CompartmentRegistrationSchema, CompartmentGradeUpdate
+from app.schemas.examination import CompartmentRegistrationCreate, CompartmentRegistration as CompartmentRegistrationSchema, CompartmentGradeUpdate, CompartmentStudentDetails
 from app.models.examination import Compartment as CompartmentRegistration
+
+@router.get("/compartment/details", response_model=List[CompartmentStudentDetails])
+def read_compartment_details(
+    semester_id: int,
+    course_code: str,
+    db: Session = Depends(deps.get_db),
+    current_user: User = Depends(deps.get_current_user),
+) -> Any:
+    """
+    Retrieve students registered for compartment exam for a specific course offering.
+    """
+    if current_user.current_role not in [UserRole.TEACHER, UserRole.ADMIN]:
+        raise HTTPException(
+            status_code=403, detail="Not authorized to access this endpoint"
+        )
+        
+    offering = db.query(CourseOffering).filter(
+        CourseOffering.semester_id == semester_id,
+        CourseOffering.course_code == course_code
+    ).first()
+    
+    if not offering:
+        raise HTTPException(status_code=404, detail="Course offering not found")
+        
+    # Check permissions for Teacher
+    if current_user.current_role == UserRole.TEACHER:
+        # Check if teacher teaches this course
+        # Note: We need TeacherCourse model import for this check if we want to be strict.
+        # Assuming admin handles compartment mostly, but let's be safe.
+        # Importing locally to avoid circulars if any, though model imports are usually fine.
+        from app.models.course import TeacherCourse
+        is_assigned = db.query(TeacherCourse).filter(
+            TeacherCourse.teacher_id == current_user.id,
+            TeacherCourse.course_offering_id == offering.id
+        ).first()
+        if not is_assigned:
+             raise HTTPException(
+                status_code=403, detail="Not authorized to view details for this course"
+            )
+
+    compartment_regs = db.query(CompartmentRegistration).filter(
+        CompartmentRegistration.course_offering_id == offering.id
+    ).all()
+    
+    results = []
+    for comp in compartment_regs:
+        # Get original grade from Registration
+        reg = db.query(Registration).filter(
+            Registration.student_id == comp.student_id,
+            Registration.course_offering_id == offering.id
+        ).first()
+        
+        results.append(CompartmentStudentDetails(
+            id=comp.id,
+            student_id=comp.student_id,
+            student_name=comp.student.name if comp.student else "Unknown",
+            grade=comp.grade,
+            grade_point=comp.grade_point,
+            original_grade=reg.grade if reg else None
+        ))
+        
+    return results
 
 @router.post("/compartment", response_model=CompartmentRegistrationSchema)
 def register_compartment(
@@ -361,13 +451,52 @@ def bulk_register_compartment(
     contents = file.file.read().decode("utf-8")
     csv_reader = csv.DictReader(io.StringIO(contents))
     
+    # Validate headers
+    fieldnames = csv_reader.fieldnames
+    if not fieldnames:
+        raise HTTPException(status_code=400, detail="CSV file is empty or has no headers")
+    
+    required_fields = {'student_id', 'course_code'}
+    if not required_fields.issubset(set(fieldnames)):
+         missing = required_fields - set(fieldnames)
+         raise HTTPException(status_code=400, detail=f"Missing required columns: {', '.join(missing)}")
+    
+    if 'semester' not in fieldnames:
+         raise HTTPException(status_code=400, detail="Missing required column: semester")
+
     registered_count = 0
     errors = []
     
-    for row in csv_reader:
+    from app.models.academic import Semester
+    from app.models.course import CourseOffering
+    
+    for row_idx, row in enumerate(csv_reader):
         try:
-            student_id = row["student_id"].strip()
-            course_offering_id = int(row["course_offering_id"].strip())
+            student_id = row.get("student_id", "").strip() if row.get("student_id", "") else None
+            course_code = row.get("course_code", "").strip() if row.get("course_code", "") else None
+            semester_name = row.get("semester", "").strip() if row.get("semester", "") else None
+            
+            if not student_id or not course_code or not semester_name:
+                errors.append(f"Row {row_idx}: Missing required fields")
+                continue
+            
+            # Lookup semester
+            semester = db.query(Semester).filter(Semester.name == semester_name).first()
+            if not semester:
+                errors.append(f"Row {row_idx}: Semester '{semester_name}' not found")
+                continue
+            
+            # Lookup offering
+            offering = db.query(CourseOffering).filter(
+                CourseOffering.course_code == course_code,
+                CourseOffering.semester_id == semester.id
+            ).first()
+            
+            if not offering:
+                errors.append(f"Row {row_idx}: Course offering not found for {course_code} in semester {semester_name}")
+                continue
+            
+            course_offering_id = offering.id
             
             # Verify registration
             reg = db.query(Registration).filter(
@@ -376,7 +505,7 @@ def bulk_register_compartment(
             ).first()
             
             if not reg:
-                errors.append(f"Student {student_id} not registered for course {course_offering_id}")
+                errors.append(f"Row {row_idx}: Student {student_id} not registered for course {course_code}")
                 continue
                 
             # Check existing
@@ -386,7 +515,7 @@ def bulk_register_compartment(
             ).first()
             
             if existing:
-                errors.append(f"Student {student_id} already registered for compartment in {course_offering_id}")
+                errors.append(f"Row {row_idx}: Student {student_id} already registered for compartment in {course_code}")
                 continue
                 
             compartment_reg = CompartmentRegistration(
@@ -397,7 +526,7 @@ def bulk_register_compartment(
             registered_count += 1
             
         except Exception as e:
-            errors.append(f"Error processing row {row}: {str(e)}")
+            errors.append(f"Row {row_idx}: {str(e)}")
             
     db.commit()
     
@@ -437,17 +566,40 @@ def update_compartment_grade(
 
 @router.post("/compartment/bulk-grades", response_model=Any)
 def bulk_upload_compartment_grades(
-    *,
-    db: Session = Depends(deps.get_db),
+    course_code: str,
+    semester_id: int,
     file: UploadFile = File(...),
+    db: Session = Depends(deps.get_db),
     current_user: User = Depends(deps.get_current_active_teacher),
 ) -> Any:
     """
     Bulk upload grades for compartment examination via CSV.
-    CSV Format: student_id, course_offering_id, grade
+    CSV Format: student_id, grade
     """
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="Invalid file format. Please upload a CSV file.")
+        
+    # Verify offering
+    offering = db.query(CourseOffering).filter(
+        CourseOffering.course_code == course_code,
+        CourseOffering.semester_id == semester_id
+    ).first()
+    
+    if not offering:
+        raise HTTPException(status_code=404, detail="Course offering not found")
+
     contents = file.file.read().decode("utf-8")
     csv_reader = csv.DictReader(io.StringIO(contents))
+    
+    # Validate headers
+    fieldnames = csv_reader.fieldnames
+    if not fieldnames:
+        raise HTTPException(status_code=400, detail="CSV file is empty or has no headers")
+        
+    required_fields = {'student_id', 'grade'}
+    if not required_fields.issubset(set(fieldnames)):
+         missing = required_fields - set(fieldnames)
+         raise HTTPException(status_code=400, detail=f"Missing required columns: {', '.join(missing)}")
     
     updated_count = 0
     errors = []
@@ -455,23 +607,27 @@ def bulk_upload_compartment_grades(
     # Cache mappings
     mappings = {m.grade: m.points for m in db.query(GradeMapping).all()}
     
-    for row in csv_reader:
+    for row_idx, row in enumerate(csv_reader):
         try:
-            student_id = row["student_id"].strip()
-            course_offering_id = int(row["course_offering_id"].strip())
-            grade = row["grade"].strip()
+            student_id = row.get("student_id", "").strip()
+            grade = row.get("grade", "").strip()
             
+            if not student_id or not grade:
+                errors.append(f"Row {row_idx}: Missing student_id or grade")
+                continue
+            
+            # Find compartment registration using offering Context
             compartment_reg = db.query(CompartmentRegistration).filter(
                 CompartmentRegistration.student_id == student_id,
-                CompartmentRegistration.course_offering_id == course_offering_id
+                CompartmentRegistration.course_offering_id == offering.id
             ).first()
             
             if not compartment_reg:
-                errors.append(f"Compartment registration not found for student {student_id} in course {course_offering_id}")
+                errors.append(f"Row {row_idx}: Compartment registration not found for student {student_id}")
                 continue
             
             if grade not in mappings:
-                errors.append(f"Invalid grade {grade} for student {student_id}")
+                errors.append(f"Row {row_idx}: Invalid grade {grade} for student {student_id}")
                 continue
                 
             compartment_reg.grade = grade
@@ -480,7 +636,7 @@ def bulk_upload_compartment_grades(
             updated_count += 1
             
         except Exception as e:
-            errors.append(f"Error processing row {row}: {str(e)}")
+            errors.append(f"Row {row_idx}: {str(e)}")
             
     db.commit()
     

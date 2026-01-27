@@ -104,6 +104,14 @@ async def bulk_upload_marks(
     decoded_content = content.decode('utf-8')
     csv_reader = csv.DictReader(io.StringIO(decoded_content))
     
+    # Validate headers
+    fieldnames = csv_reader.fieldnames
+    if not fieldnames:
+        raise HTTPException(status_code=400, detail="CSV file is empty or has no headers")
+    
+    if 'student_id' not in fieldnames:
+        raise HTTPException(status_code=400, detail="Missing required column: student_id")
+    
     marks_updated = 0
     exams_processed = set()
     errors = []
@@ -113,11 +121,12 @@ async def bulk_upload_marks(
     
     for row_idx, row in enumerate(csv_reader):
         try:
-            student_id = row.get('student_id')
+            student_id = row.get('student_id', '').strip() if row.get('student_id', '') else None
             if not student_id:
                 errors.append(f"Row {row_idx}: Missing student_id")
                 continue
             
+            # Check registration only if student_id is present
             registration = db.query(Registration).filter(
                 Registration.student_id == student_id,
                 Registration.course_offering_id == offering.id
@@ -128,19 +137,22 @@ async def bulk_upload_marks(
                 continue
 
             for key, value in row.items():
-                if key == 'student_id': continue
+                if key == 'student_id' or not key: 
+                    continue
                 
-                exam_name = key
+                exam_name = key.strip()
+                val_str = value.strip() if value else ''
+                
+                if not val_str:
+                    continue # Skip empty values
+                    
                 try:
-                    marks_obtained = float(value)
+                    marks_obtained = float(val_str)
                 except ValueError:
-                    errors.append(f"Row {row_idx}: Invalid marks for {exam_name}")
+                    errors.append(f"Row {row_idx}: Invalid marks '{val_str}' for {exam_name}")
                     continue
                 
                 if exam_name not in existing_exams:
-                    # Auto create exam? Or error? Let's error for now as per strict design, or maybe auto-create if we want flexibility.
-                    # Design didn't specify auto-create exams on marks upload, but it's handy.
-                    # Let's assume exams must exist.
                     errors.append(f"Row {row_idx}: Examination {exam_name} not found")
                     continue
                 

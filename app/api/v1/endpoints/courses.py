@@ -156,6 +156,8 @@ def read_course_offerings(
     """
     offerings = db.query(CourseOffering).filter(CourseOffering.semester_id == semester_id).all()
     return offerings
+            # Check/Create Course
+
 
 @router.post("/offerings/", response_model=CourseOfferingSchema)
 def create_course_offering(
@@ -229,6 +231,7 @@ async def bulk_upload_course_offerings(
 ) -> Any:
     """
     Bulk upload course offerings from CSV.
+    CSV Format: course_code, semester_id, course_name, category, credits, teacher_ids   
     """
     if not file.filename.endswith('.csv'):
         raise HTTPException(status_code=400, detail="Invalid file format. Please upload a CSV file.")
@@ -242,8 +245,14 @@ async def bulk_upload_course_offerings(
     if not fieldnames:
         raise HTTPException(status_code=400, detail="CSV file is empty or has no headers")
     
+    # Validate headers
+    required_fields = {'course_code','semester'}
+    if not required_fields.issubset(set(fieldnames)):
+         missing = required_fields - set(fieldnames)
+         raise HTTPException(status_code=400, detail=f"Missing required columns: {', '.join(missing)}")
+    
     # Identify exam columns (all columns except known reserved columns)
-    reserved_columns = {'course_code', 'semester_id', 'course_name', 'category', 'credits', 'teacher_ids'}
+    reserved_columns = {'course_code', 'semester', 'course_name', 'category', 'credits', 'teacher_ids'}
     exam_columns = [col for col in fieldnames if col not in reserved_columns]
     
     courses_created = 0
@@ -251,31 +260,44 @@ async def bulk_upload_course_offerings(
     exams_created = 0
     errors = []
     
+    from app.models.academic import Semester
+    
     for row_idx, row in enumerate(csv_reader):
         try:
-            course_code = row.get('course_code')
-            semester_id = int(row.get('semester_id'))
+            course_code = row.get('course_code', '').strip() if row.get('course_code', '') else None
+            semester_name = row.get('semester', '').strip() if row.get('semester', '') else None   
+            course_name = row.get('course_name', '').strip() if row.get('course_name', '') else None
+            category_str = row.get('category', '').strip() if row.get('category', '') else None
+            credits_str = row.get('credits', '').strip() if row.get('credits', '') else None
+            teacher_ids_str = row.get('teacher_ids', '').strip() if row.get('teacher_ids', '') else None
             
-            if not course_code or not semester_id:
-                errors.append(f"Row {row_idx}: Missing course_code or semester_id")
+            if not course_code or not semester_name:
+                errors.append(f"Row {row_idx}: Missing course_code or semester")
                 continue
 
+            # Lookup semester
+            semester = db.query(Semester).filter(Semester.name == semester_name).first()
+            if not semester:
+                errors.append(f"Row {row_idx}: Semester '{semester_name}' not found")
+                continue
+            semester_id = semester.id
+            
             # Check/Create Course
             course = db.query(Course).filter(Course.code == course_code).first()
             if not course:
                 # Create course if details provided
-                if 'course_name' in row and 'category' in row:
+                if course_name and category_str:
                      # Parse credits L-T-P
                     l, t, p = 0, 0, 0
-                    if 'credits' in row:
-                        parts = row['credits'].split('-')
+                    if credits_str:
+                        parts = credits_str.split('-')
                         if len(parts) == 3:
                             l, t, p = map(int, parts)
                     
                     course = Course(
                         code=course_code,
-                        name=row['course_name'],
-                        category=CourseCategory(row['category']),
+                        name=course_name,
+                        category=CourseCategory(category_str),
                         lecture_credits=l,
                         tutorial_credits=t,
                         practice_credits=p
@@ -300,8 +322,8 @@ async def bulk_upload_course_offerings(
                 offerings_created += 1
             
             # Assign Teachers
-            if 'teacher_ids' in row and row['teacher_ids']:
-                teacher_ids = row['teacher_ids'].split(';')
+            if teacher_ids_str:
+                teacher_ids = teacher_ids_str.split(';')
                 for tid in teacher_ids:
                     tid = tid.strip()
                     if not tid: continue
@@ -319,7 +341,7 @@ async def bulk_upload_course_offerings(
             
             # Process exam columns
             for exam_name in exam_columns:
-                max_marks_str = row.get(exam_name, '').strip()
+                max_marks_str = row.get(exam_name, '').strip() if row.get(exam_name, '') else None
                 
                 # Skip if empty or zero
                 if not max_marks_str or max_marks_str == '0':

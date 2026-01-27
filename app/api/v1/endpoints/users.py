@@ -168,6 +168,12 @@ async def bulk_upload_users(
     decoded_content = content.decode('utf-8')
     csv_reader = csv.DictReader(io.StringIO(decoded_content))
     
+    # Validate headers
+    required_fields = {'id', 'name', 'email', 'password', 'gender', 'address', 'phone_number', 'roles'}
+    if not csv_reader.fieldnames or not required_fields.issubset(set(csv_reader.fieldnames)):
+         missing = required_fields - set(csv_reader.fieldnames or [])
+         raise HTTPException(status_code=400, detail=f"Missing required columns: {', '.join(missing)}")
+
     users_created = 0
     errors = []
     
@@ -175,7 +181,7 @@ async def bulk_upload_users(
     
     for row_idx, row in enumerate(csv_reader):
         try:
-            user_id = row.get('id', '').strip()
+            user_id = row.get('id', '').strip() if row.get('id', '') else None
             if not user_id:
                 errors.append(f"Row {row_idx}: Missing user id")
                 continue
@@ -187,7 +193,7 @@ async def bulk_upload_users(
                 continue
                 
             # Validate discipline if provided
-            discipline_code = row.get('discipline_code', '').strip()
+            discipline_code = row.get('discipline_code', '').strip() if row.get('discipline_code', '') else None
             if discipline_code:
                 discipline = db.query(Discipline).filter(Discipline.code == discipline_code).first()
                 if not discipline:
@@ -195,7 +201,12 @@ async def bulk_upload_users(
                     continue
             else:
                 discipline_code = None
-                
+            
+            roles_str = row.get('roles', '').strip() if row.get('roles', '') else None
+            if not roles_str:
+                errors.append(f"Row {row_idx}: Missing roles")
+                continue
+            
             # Create user
             user = User(
                 id=user_id,
@@ -210,10 +221,10 @@ async def bulk_upload_users(
             )
             db.add(user)
             db.flush()
-            
+            print("User created")
             # Add roles
-            roles_str = row.get('roles', '').strip()
             if roles_str:
+                print("Trying inside roles")
                 roles = [r.strip() for r in roles_str.split(';') if r.strip()]
                 for role_name in roles:
                     try:
@@ -257,8 +268,18 @@ def update_user(
         del update_data["password"]
         update_data["hashed_password"] = hashed_password
         
+    roles_enums = None
+    if "roles" in update_data:
+        roles_enums = update_data.pop("roles")
+
     for field, value in update_data.items():
         setattr(user, field, value)
+        
+    if roles_enums is not None:
+        from app.models.user import UserRoleEntry
+        # Replace existing roles
+        # Note: We can re-assign the list of UserRoleEntry objects
+        user.roles = [UserRoleEntry(role=r) for r in roles_enums]
         
     db.add(user)
     db.commit()

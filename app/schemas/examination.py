@@ -77,3 +77,12 @@ class MarkUpdate(BaseModel):
     student_id: str
     exam_name: str
     marks: float
+
+class CompartmentStudentDetails(BaseModel):
+    id: int
+    student_id: str
+    student_name: str
+    grade: Optional[str] = None
+    grade_point: Optional[float] = None
+    original_grade: Optional[str] = None
+
