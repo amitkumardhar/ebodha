@@ -17,7 +17,7 @@ class UserBase(BaseModel):
 class UserRoleEntry(BaseModel):
     role: UserRole
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class UserCreate(UserBase):
     id: str # Student ID or Login ID
@@ -38,7 +38,7 @@ class UserInDBBase(UserBase):
     roles: List[UserRoleEntry] = []
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class User(UserInDBBase):
     pass

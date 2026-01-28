@@ -320,6 +320,7 @@ def get_my_report(
         # Sort marks by examination_id
         marks_list.sort(key=lambda x: x.examination_id)
             
+        # Get Compartment Grade
         compartment_reg = db.query(CompartmentRegistration).filter(
             CompartmentRegistration.student_id == current_user.id,
             CompartmentRegistration.course_offering_id == reg.course_offering_id

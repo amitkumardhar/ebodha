@@ -32,20 +32,30 @@
       </template>
 
       <v-divider class="my-1"></v-divider>
-      <v-list-item @click="logout" link>
-        <v-list-item-title class="text-body-2 text-error">Log Out</v-list-item-title>
+      <v-list-item @click="changePasswordDialog = true" link>
+        <v-list-item-title class="text-body-2">Change Password</v-list-item-title>
       </v-list-item>
+      
+      <v-item-group>
+        <v-list-item @click="logout" link>
+            <v-list-item-title class="text-body-2 text-error">Log Out</v-list-item-title>
+        </v-list-item>
+      </v-item-group>
     </v-list>
   </v-menu>
+
+  <ChangePasswordDialog v-model="changePasswordDialog" />
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import ChangePasswordDialog from './ChangePasswordDialog.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
+const changePasswordDialog = ref(false)
 
 const availableRoles = computed(() => {
     return auth.roles.filter(r => r !== auth.currentRole)

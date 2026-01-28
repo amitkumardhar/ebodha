@@ -1,7 +1,8 @@
 
-from sqlalchemy import Column, String, Boolean, Enum, Integer, ForeignKey
+from sqlalchemy import Column, String, Boolean, Enum, Integer, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 import enum
+from datetime import datetime
 from app.db.base_class import Base
 
 class UserRole(str, enum.Enum):
@@ -19,6 +20,7 @@ class User(Base):
     email = Column(String, index=True)
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
     discipline_code = Column(String, ForeignKey("discipline.code"), nullable=True)
     
     roles = relationship("UserRoleEntry", back_populates="user", cascade="all, delete-orphan")

@@ -14,3 +14,13 @@ class RevokedToken(Document):
         indexes = [
             IndexModel([("expires_at", ASCENDING)], expireAfterSeconds=0)
         ]
+
+class UserGlobalRevocation(Document):
+    user_id: str
+    revoked_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Settings:
+        name = "user_global_revocations"
+        indexes = [
+            IndexModel([("user_id", ASCENDING)], unique=True)
+        ]

@@ -24,3 +24,10 @@ class StudentGradeReportItem(BaseModel):
     compartment_grade: Optional[str] = None
     compartment_grade_point: Optional[float] = None
     marks: List[ExamMarksReport]
+
+class GradeCardRequest(BaseModel):
+    student_ids: List[str]
+    semester_id: int
+
+class TranscriptRequest(BaseModel):
+    student_ids: List[str]

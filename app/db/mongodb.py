@@ -4,9 +4,9 @@ from beanie import init_beanie
 from app.core.config import settings
 
 from app.models.log import APILog
-from app.models.token import RevokedToken
+from app.models.token import RevokedToken, UserGlobalRevocation
 
 async def init_mongodb():
     client = AsyncIOMotorClient(settings.MONGODB_URL)
     # We will add document models here later
-    await init_beanie(database=client[settings.MONGODB_DB_NAME], document_models=[APILog, RevokedToken])
+    await init_beanie(database=client[settings.MONGODB_DB_NAME], document_models=[APILog, RevokedToken, UserGlobalRevocation])

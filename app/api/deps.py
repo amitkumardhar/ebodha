@@ -11,7 +11,7 @@ from app.core import security
 from app.core.config import settings
 from app.models.user import User, UserRole
 from app.schemas.user import TokenPayload
-from app.models.token import RevokedToken
+from app.models.token import RevokedToken, UserGlobalRevocation
 
 reusable_oauth2 = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/login/access-token"
@@ -44,6 +44,21 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has been revoked",
         )
+        
+    # Check global revocation (Password changes)
+    # If token issued BEFORE last revocation, deny.
+    global_revocation = await UserGlobalRevocation.find_one(UserGlobalRevocation.user_id == token_data.sub)
+    if global_revocation:
+        if "iat" in payload:
+            token_iat = payload["iat"]
+            revoked_ts = global_revocation.revoked_at.timestamp()
+            # Allow a small buffer (e.g. 1 sec) or strictly > ?
+            # Logic: if iat < revoked_at => token is old.
+            if token_iat < revoked_ts:
+                 raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Session expired, please login again",
+                )
 
     user = db.query(User).filter(User.id == token_data.sub).first()
     if not user:
