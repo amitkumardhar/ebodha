@@ -301,7 +301,10 @@ def get_my_report(
             code=c.code,
             name=c.name,
             semester_id=reg.course_offering.semester_id,
-            credits=credits_str
+            credits=credits_str,
+            lecture_credits=c.lecture_credits,
+            tutorial_credits=c.tutorial_credits,
+            practice_credits=c.practice_credits
         )
         
         # Get Marks
@@ -317,19 +320,20 @@ def get_my_report(
         # Sort marks by examination_id
         marks_list.sort(key=lambda x: x.examination_id)
             
-        # Get Compartment Grade
         compartment_reg = db.query(CompartmentRegistration).filter(
             CompartmentRegistration.student_id == current_user.id,
             CompartmentRegistration.course_offering_id == reg.course_offering_id
         ).first()
         
         compartment_grade = compartment_reg.grade if compartment_reg else None
+        compartment_grade_point = compartment_reg.grade_point if compartment_reg else None
             
         report.append(StudentGradeReportItem(
             course=course_info,
             grade=reg.grade,
             grade_point=reg.grade_point,
             compartment_grade=compartment_grade,
+            compartment_grade_point=compartment_grade_point,
             marks=marks_list
         ))
         

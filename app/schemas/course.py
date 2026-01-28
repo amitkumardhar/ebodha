@@ -57,4 +57,7 @@ class StudentCourseDetails(BaseModel):
     student_name: str
     grade: Optional[str]
     grade_point: Optional[float]
+    compartment_grade: Optional[str] = None
+    course_grade: Optional[str] = None
+    compartment_registration_id: Optional[int] = None
     marks: List[ExamMarksReport]

@@ -10,6 +10,10 @@
                 </span>
             </div>
         </div>
+        <v-card class="px-4 py-2 bg-primary text-white" elevation="2">
+            <div class="text-caption text-uppercase">CGPA: </div>
+            <div class="text-h4 font-weight-bold">{{ cgpa }}</div>
+        </v-card>
         <v-btn color="primary" prepend-icon="mdi-download" @click="downloadReport" :disabled="!report.length">
             Download Record
         </v-btn>
@@ -27,7 +31,12 @@
         :key="semester.id"
       >
         <v-expansion-panel-title class="text-h6">
-            {{ getSemesterName(semester.id) }}
+            <div class="d-flex justify-space-between w-100 align-center pr-4">
+                <span>{{ getSemesterName(semester.id) }}</span>
+                <span v-if="semester.sgpa" class="text-subtitle-1 font-weight-bold text-primary bg-blue-lighten-5 px-3 py-1 rounded">
+                    SGPA: {{ semester.sgpa }}
+                </span>
+            </div>
             <template v-slot:actions="{ expanded }">
                 <v-icon :icon="expanded ? 'mdi-minus' : 'mdi-plus'"></v-icon>
             </template>
@@ -45,8 +54,8 @@
                                 {{ item.course.code }}: {{ item.course.name }}
                             </v-col>
                             <v-col cols="4" class="text-right text-caption">
-                                <span v-if="item.grade" class="px-2 py-1 border rounded">
-                                    Grade: {{ item.grade }} ({{ item.grade_point }})
+                                <span v-if="getEffectiveGrade(item).grade" class="px-2 py-1 border rounded">
+                                    Grade: {{ getEffectiveGrade(item).grade }} ({{ getEffectiveGrade(item).points }})
                                 </span>
                                 <span v-else class="text-disabled">Grade Pending</span>
                             </v-col>
@@ -73,7 +82,13 @@
                                 </tr>
                             </tbody>
                         </v-table>
-                        <div class="mt-2 text-caption">Credits: {{ item.course.credits }}</div>
+                        <div class="mt-2 text-caption d-flex justify-space-between">
+                            <span>Credits: {{ item.course.credits }}</span>
+                            <span>
+                                <span v-if="item.grade" class="mr-2">Original: {{ item.grade }} ({{ item.grade_point }})</span>
+                                <span v-if="item.compartment_grade">Compartment: {{ item.compartment_grade }} ({{ item.compartment_grade_point }})</span>
+                            </span>
+                        </div>
                     </v-expansion-panel-text>
                 </v-expansion-panel>
             </v-expansion-panels>
@@ -144,6 +159,57 @@ const getSemesterName = (id) => {
     return sem ? (sem.name || `Semester ${sem.id}`) : `Semester ${id}`
 }
 
+const calculateCredit = (course) => {
+    return course.lecture_credits + course.tutorial_credits + (course.practice_credits / 2)
+}
+
+const getEffectiveGrade = (item) => {
+    let grade = item.grade
+    let points = item.grade_point
+    
+    if (item.compartment_grade && item.compartment_grade_point !== null) {
+        if (points === null || item.compartment_grade_point > points) {
+            grade = item.compartment_grade
+            points = item.compartment_grade_point
+        }
+    }
+    return { grade, points }
+}
+
+const calculateSGPA = (courses) => {
+    let totalPoints = 0
+    let totalCredits = 0
+    
+    courses.forEach(item => {
+        const { points } = getEffectiveGrade(item)
+        if (points !== null && points !== undefined) {
+             const credit = calculateCredit(item.course)
+             totalPoints += (points * credit)
+             totalCredits += credit
+        }
+    })
+    
+    return totalCredits > 0 ? (totalPoints / totalCredits).toFixed(2) : null
+}
+
+const cgpa = computed(() => {
+    if (!report.value.length) return null
+    
+    let totalPoints = 0
+    let totalCredits = 0
+    
+    report.value.forEach(item => {
+        const { points } = getEffectiveGrade(item)
+        if (points !== null && points !== undefined) {
+             const credit = calculateCredit(item.course)
+             totalPoints += (points * credit)
+             totalCredits += credit
+        }
+    })
+    
+    return totalCredits > 0 ? (totalPoints / totalCredits).toFixed(2) : null
+})
+
 const groupedData = computed(() => {
     const groups = {}
     report.value.forEach(item => {
@@ -151,11 +217,18 @@ const groupedData = computed(() => {
         if (!groups[semId]) {
             groups[semId] = {
                 id: semId,
-                courses: []
+                courses: [],
+                sgpa: null
             }
         }
         groups[semId].courses.push(item)
     })
+    
+    // Calculate SGPA for each semester
+    Object.values(groups).forEach(group => {
+        group.sgpa = calculateSGPA(group.courses)
+    })
+
     // Convert to array and sort by semester id descending
     return Object.values(groups).sort((a, b) => b.id - a.id)
 })

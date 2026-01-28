@@ -27,6 +27,18 @@
             density="compact"
             class="mb-6"
         >
+            <template v-slot:item.id="{ item }">
+                <a 
+                    v-if="isStudentOrAlumni(item)" 
+                    href="#" 
+                    @click.prevent="openHistoryDialog(item.id)"
+                    class="text-decoration-underline text-primary"
+                    style="cursor: pointer;"
+                >
+                    {{ item.id }}
+                </a>
+                <span v-else>{{ item.id }}</span>
+            </template>
             <template v-slot:item.roles="{ item }">
                 <v-chip
                     v-for="roleEntry in item.roles"
@@ -118,7 +130,8 @@
         </v-card>
     </v-dialog>
 
-    <!-- Bulk Upload Result Dialog -->
+    <AcademicHistoryDialog v-model="historyDialog" :user-id="historyUserId" />
+
     <v-dialog v-model="resultDialog" max-width="600">
         <v-card>
             <v-card-title :class="['text-h6', resultStats.errors?.length ? 'text-warning' : 'text-success']">
@@ -155,6 +168,7 @@ import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { useAuthStore } from '../../stores/auth'
 import { downloadDataAsCSV } from '../../utils/csv'
+import AcademicHistoryDialog from './AcademicHistoryDialog.vue'
 
 const auth = useAuthStore()
 
@@ -272,8 +286,27 @@ const uploadUsers = async () => {
     }
 }
 
+
 const downloadUsers = () => {
     downloadDataAsCSV(users.value, userHeaders, 'Users', auth.user?.name || 'User')
+}
+
+// Academic History
+const historyDialog = ref(false)
+const historyUserId = ref(null)
+
+const openHistoryDialog = (userId) => {
+    historyUserId.value = userId
+    historyDialog.value = true
+}
+
+const isStudentOrAlumni = (user) => {
+    if (!user.roles) return false
+    // Handle both array of objects and array of strings if structure varies, 
+    // though backend seems to return obj with role enum.
+    // user.roles is list of {role: "student", ...}
+    const roles = user.roles.map(r => r.role)
+    return roles.includes('student') || roles.includes('alumni')
 }
 
 onMounted(() => {

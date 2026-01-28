@@ -13,10 +13,14 @@ class CourseInfo(BaseModel):
     name: str
     semester_id: int
     credits: str # Formatted L-T-P
+    lecture_credits: int
+    tutorial_credits: int
+    practice_credits: int
 
 class StudentGradeReportItem(BaseModel):
     course: CourseInfo
     grade: Optional[str]
     grade_point: Optional[float]
     compartment_grade: Optional[str] = None
+    compartment_grade_point: Optional[float] = None
     marks: List[ExamMarksReport]

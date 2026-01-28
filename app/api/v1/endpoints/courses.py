@@ -76,7 +76,7 @@ def read_semester_courses(
     return offerings
 
 from app.schemas.course import StudentCourseDetails
-from app.models.examination import Registration
+from app.models.examination import Registration, Compartment
 from app.schemas.report import ExamMarksReport
 
 @router.get("/semester-course-details", response_model=List[StudentCourseDetails])
@@ -134,12 +134,32 @@ def read_semester_course_details(
         # Sort marks by examination_id
         marks_list.sort(key=lambda x: x.examination_id)
         
+        # Compartment details
+        comp_reg = db.query(Compartment).filter(
+            Compartment.student_id == reg.student_id,
+            Compartment.course_offering_id == offering.id
+        ).first()
+        
+        compartment_grade = comp_reg.grade if comp_reg else None
+        compartment_registration_id = comp_reg.id if comp_reg else None
+        
+        # Calculate Course Grade (better of original and compartment)
+        course_grade = reg.grade
+        if compartment_grade:
+            reg_gp = reg.grade_point if reg.grade_point is not None else -1.0
+            comp_gp = comp_reg.grade_point if comp_reg.grade_point is not None else -1.0
+            if comp_gp > reg_gp:
+                course_grade = compartment_grade
+
         results.append(StudentCourseDetails(
             registration_id=reg.id,
             student_id=reg.student_id,
             student_name=reg.student.name,
             grade=reg.grade,
             grade_point=reg.grade_point,
+            compartment_grade=compartment_grade,
+            course_grade=course_grade,
+            compartment_registration_id=compartment_registration_id,
             marks=marks_list
         ))
         

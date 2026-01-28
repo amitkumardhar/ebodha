@@ -98,9 +98,45 @@
             :search="searchStudents"
             density="compact"
         >
+            <template v-slot:item.student_id="{ item }">
+                <a 
+                    href="#" 
+                    @click.prevent="openHistoryDialog(item.student_id)"
+                    class="text-decoration-underline text-primary"
+                    style="cursor: pointer;"
+                >
+                    {{ item.student_id }}
+                </a>
+            </template>
             <template v-slot:item.grade="{ item }">
                <div class="d-flex align-center">
                     <span class="mr-2">{{ item.grade || '-' }}</span>
+                    <v-btn 
+                        icon="mdi-pencil" 
+                        size="x-small" 
+                        variant="text" 
+                        density="compact" 
+                        class="ml-1 text-medium-emphasis" 
+                        @click="openEditGradeDialog(item, 'original')"
+                    ></v-btn>
+                </div>
+            </template>
+            <template v-slot:item.compartment_grade="{ item }">
+               <div class="d-flex align-center">
+                    <span class="mr-2">{{ item.compartment_grade || '-' }}</span>
+                    <v-btn 
+                        icon="mdi-pencil" 
+                        size="x-small" 
+                        variant="text" 
+                        density="compact" 
+                        class="ml-1 text-medium-emphasis" 
+                        @click="openEditGradeDialog(item, 'compartment')"
+                    ></v-btn>
+                </div>
+            </template>
+            <template v-slot:item.course_grade="{ item }">
+               <div class="d-flex align-center font-weight-bold">
+                    <span class="mr-2">{{ item.course_grade || '-' }}</span>
                 </div>
             </template>
             <template v-slot:item.marks="{ item }">
@@ -174,6 +210,27 @@
         </v-card>
     </v-dialog>
 
+    <!-- Edit Grade Dialog -->
+    <v-dialog v-model="editGradeDialog" max-width="400">
+        <v-card>
+            <v-card-title>Edit Grade</v-card-title>
+            <v-card-text>
+                <div class="text-subtitle-1 mb-2">{{ editGradeData.student_name }}</div>
+                <v-text-field
+                    v-model="editGradeData.grade"
+                    label="Grade"
+                    variant="outlined"
+                    autofocus
+                ></v-text-field>
+            </v-card-text>
+            <v-card-actions>
+                <v-spacer></v-spacer>
+                <v-btn variant="text" @click="editGradeDialog = false">Cancel</v-btn>
+                <v-btn color="primary" @click="saveGrade" :loading="savingGrade">Save</v-btn>
+            </v-card-actions>
+        </v-card>
+    </v-dialog>
+
     <!-- Bulk Upload Result Dialog -->
     <v-dialog v-model="resultDialog" max-width="600">
         <v-card>
@@ -201,6 +258,8 @@
         </v-card>
     </v-dialog>
 
+    <AcademicHistoryDialog v-model="historyDialog" :user-id="historyUserId" />
+
     <v-snackbar v-model="snackbar.show" :color="snackbar.color">
         {{ snackbar.text }}
     </v-snackbar>
@@ -212,6 +271,7 @@ import { ref, onMounted } from 'vue'
 import axios from 'axios'
 import { useAuthStore } from '../stores/auth'
 import { downloadDataAsCSV } from '../utils/csv'
+import AcademicHistoryDialog from './admin/AcademicHistoryDialog.vue'
 
 const auth = useAuthStore()
 
@@ -236,14 +296,30 @@ const resultStats = ref({ message: '', errors: [] })
 const editMarkDialog = ref(false)
 const editMarkData = ref({ student_id: '', student_name: '', exam_name: '', marks: 0 })
 const savingMark = ref(false)
+
+const editGradeDialog = ref(false)
+const editGradeData = ref({ registration_id: null, compartment_registration_id: null, student_name: '', grade: '', type: 'original' })
+const savingGrade = ref(false)
+
 const snackbar = ref({ show: false, text: '', color: 'success' })
 
 const studentHeaders = [
     { title: 'Student ID', key: 'student_id' },
     { title: 'Name', key: 'student_name' },
-    { title: 'Grade', key: 'grade' },
     { title: 'Marks', key: 'marks' },
+    { title: 'Original Grade', key: 'grade', width: '130px' },
+    { title: 'Compartment Grade', key: 'compartment_grade', width: '130px' },
+    { title: 'Course Grade', key: 'course_grade', width: '130px' }
 ]
+
+// Academic History Dialog State
+const historyDialog = ref(false)
+const historyUserId = ref(null)
+
+const openHistoryDialog = (studentId) => {
+    historyUserId.value = studentId
+    historyDialog.value = true
+}
 
 // Data Fetching
 const fetchSemesters = async () => {
@@ -358,6 +434,51 @@ const saveMark = async () => {
     }
 }
 
+const openEditGradeDialog = (item, type) => {
+    if (type === 'compartment' && !item.compartment_registration_id) {
+        snackbar.value = { show: true, text: 'Student is not registered for compartment exam.', color: 'warning' }
+        return
+    }
+
+    editGradeData.value = {
+        registration_id: item.registration_id,
+        compartment_registration_id: item.compartment_registration_id,
+        student_name: item.student_name,
+        grade: type === 'original' ? (item.grade || '') : (item.compartment_grade || ''),
+        type: type
+    }
+    editGradeDialog.value = true
+}
+
+const saveGrade = async () => {
+    if (!editGradeData.value.grade) {
+         snackbar.value = { show: true, text: 'Grade is required', color: 'error' }
+         return
+    }
+    savingGrade.value = true
+    try {
+        let endpoint = ''
+        if (editGradeData.value.type === 'original') {
+             endpoint = `http://localhost:8000/api/v1/registrations/${editGradeData.value.registration_id}/grade`
+        } else {
+             endpoint = `http://localhost:8000/api/v1/registrations/compartment/${editGradeData.value.compartment_registration_id}/grade`
+        }
+
+        await axios.put(endpoint, {
+            grade: editGradeData.value.grade
+        }, {
+             headers: { Authorization: `Bearer ${auth.token}` }
+        })
+        snackbar.value = { show: true, text: 'Grade updated', color: 'success' }
+        editGradeDialog.value = false
+        fetchDetails()
+    } catch (e) {
+        snackbar.value = { show: true, text: 'Update failed: ' + (e.response?.data?.detail || e.message), color: 'error' }
+    } finally {
+        savingGrade.value = false
+    }
+}
+
 const downloadDetails = () => {
     if (!courseDetails.value.length) return
     
@@ -386,7 +507,9 @@ const downloadDetails = () => {
         const row = {
             student_id: student.student_id,
             student_name: student.student_name,
-            grade: student.grade
+            grade: student.grade,
+            compartment_grade: student.compartment_grade,
+            course_grade: student.course_grade
         }
         
         // Fill exam marks
@@ -404,7 +527,9 @@ const downloadDetails = () => {
     const finalHeaders = [
         { title: 'Student ID', key: 'student_id' },
         { title: 'Name', key: 'student_name' },
-        { title: 'Grade', key: 'grade' },
+        { title: 'Original Grade', key: 'grade' },
+        { title: 'Compartment Grade', key: 'compartment_grade' },
+        { title: 'Course Grade', key: 'course_grade' },
         ...examHeaders
     ]
 
