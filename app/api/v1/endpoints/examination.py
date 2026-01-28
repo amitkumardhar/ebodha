@@ -90,6 +90,12 @@ async def bulk_upload_marks(
     """
     if not file.filename.endswith('.csv'):
         raise HTTPException(status_code=400, detail="Invalid file format. Please upload a CSV file.")
+        
+    try:
+        from app.services.settings import check_grade_submission_deadline
+        check_grade_submission_deadline(db, current_user)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     # Verify offering
     offering = db.query(CourseOffering).filter(
@@ -199,6 +205,12 @@ def update_marks(
     """
     Update marks for a specific student and exam.
     """
+    try:
+        from app.services.settings import check_grade_submission_deadline
+        check_grade_submission_deadline(db, current_user)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     # Verify offering
     offering = db.query(CourseOffering).filter(
         CourseOffering.course_code == mark_in.course_code,

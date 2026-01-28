@@ -157,6 +157,12 @@ def assign_grade(
     """
     Assign grade to a registration.
     """
+    try:
+        from app.services.settings import check_grade_submission_deadline
+        check_grade_submission_deadline(db, current_user)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+        
     registration = db.query(Registration).filter(Registration.id == registration_id).first()
     if not registration:
         raise HTTPException(status_code=404, detail="Registration not found")
@@ -216,6 +222,12 @@ async def bulk_upload_grades(
     """
     Bulk upload grades from CSV.
     """
+    try:
+        from app.services.settings import check_grade_submission_deadline
+        check_grade_submission_deadline(db, current_user)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     if not file.filename.endswith('.csv'):
         raise HTTPException(status_code=400, detail="Invalid file format. Please upload a CSV file.")
 
@@ -551,6 +563,12 @@ def update_compartment_grade(
     """
     Update grade for a compartment registration.
     """
+    try:
+        from app.services.settings import check_compartment_submission_deadline
+        check_compartment_submission_deadline(db, current_user)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     compartment_reg = db.query(CompartmentRegistration).filter(CompartmentRegistration.id == compartment_id).first()
     if not compartment_reg:
         raise HTTPException(status_code=404, detail="Compartment registration not found")
@@ -581,6 +599,12 @@ def bulk_upload_compartment_grades(
     Bulk upload grades for compartment examination via CSV.
     CSV Format: student_id, grade
     """
+    try:
+        from app.services.settings import check_compartment_submission_deadline
+        check_compartment_submission_deadline(db, current_user)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     if not file.filename.endswith('.csv'):
         raise HTTPException(status_code=400, detail="Invalid file format. Please upload a CSV file.")
         
